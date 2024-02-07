@@ -1,0 +1,20 @@
+workspace = { members = ["lib/geo"] }
+[package]
+name = "logbook"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Nav data
+geo = { path = "lib/geo" }
+rusqlite = { version = "0.30", features = ["bundled"] }
+
+# Time
+chrono = "0.4"
+
+# MSFS
+simconnect = "0.3"
+
+# CSV
+# serde = { version = "1.0.196", features = ["derive"] }
+# csv = "1.3"
