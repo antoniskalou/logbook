@@ -145,36 +145,43 @@ impl Flight {
         self.departure = Some((airport.clone(), *time));
     }
 
-    fn to_record(&self) -> Vec<String> {
-        // TODO: clean up this mess
+    fn to_record(&self) -> Vec<Option<String>> {
         vec![
-            self.aircraft.clone(),
-            self.registration.clone(),
-            self.taxi_out.map(|dt| date_to_string(&dt)).unwrap_or("".to_string()),
-            self.departure.clone().map(|d| d.0.ident.to_string()).unwrap_or("".to_string()),
-            self.departure.clone().map(|d| date_to_string(&d.1)).unwrap_or("".to_string()),
-            self.arrival.clone().map(|a| a.0.ident.to_string()).unwrap_or("".to_string()),
-            self.arrival.clone().map(|a| date_to_string(&a.1)).unwrap_or("".to_string()),
-            self.shutdown.map(|dt| date_to_string(&dt)).unwrap_or("".to_string()),
+            Some(self.aircraft.clone()),
+            Some(self.registration.clone()),
+            self.taxi_out.map(|dt| date_to_string(&dt)),
+            self.departure.clone().map(|d| d.0.ident),
+            self.departure.clone().map(|d| date_to_string(&d.1)),
+            self.arrival.clone().map(|a| a.0.ident),
+            self.arrival.clone().map(|a| date_to_string(&a.1)),
+            self.shutdown.map(|dt| date_to_string(&dt)),
         ]
     }
 }
 
-pub const CSV_HEADER: &str =
-    "Aircraft,Registration,Taxi Time,Departure Airport, Departure Time,Arrival Airport,Arrival Time,Shutdown Time";
+pub const CSV_HEADER: [&str; 8] = [
+    "Aircraft",
+    "Registration",
+    "Taxi Time",
+    "Departure ICAO",
+    "Departure Time",
+    "Arrival ICAO",
+    "Arrival Time",
+    "Shutdown Time",
+];
 
 struct Logbook(File);
 
 impl Logbook {
     fn new(path: &Path) -> Result<Self, Box<dyn Error>> {
         let should_add_header = !path.exists();
-        let mut f = File::options()
+        let f = File::options()
             .create(true)
             .append(true)
             .open(path)?;
 
         if should_add_header {
-            writeln!(f, "{}", CSV_HEADER)?;
+            csv::Writer::from_writer(&f).write_record(CSV_HEADER)?;
         }
 
         Ok(Logbook(f))
@@ -182,7 +189,12 @@ impl Logbook {
 
     fn log(&mut self, flight: &Flight) -> Result<(), Box<dyn Error>> {
         let mut csv = csv::Writer::from_writer(&self.0);
-        csv.write_record(&flight.to_record())?;
+        // change None to ""
+        for field in flight.to_record() {
+            csv.write_field(field.unwrap_or("".to_string()))?;
+        }
+        csv.write_record(None::<&[u8]>)?;
+        csv.flush()?;
         Ok(())
     }
 }
