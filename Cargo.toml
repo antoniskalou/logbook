@@ -17,4 +17,4 @@ simconnect = "0.3"
 
 # CSV
 # serde = { version = "1.0.196", features = ["derive"] }
-# csv = "1.3"
+csv = "1.3"

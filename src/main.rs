@@ -145,54 +145,19 @@ impl Flight {
         self.departure = Some((airport.clone(), *time));
     }
 
-    fn to_csv(&self) -> String {
+    fn to_record(&self) -> Vec<String> {
         // TODO: clean up this mess
-        format!(
-            "{},{},{},{},{},{},{},{}",
-            self.aircraft,
-            self.registration,
+        vec![
+            self.aircraft.clone(),
+            self.registration.clone(),
             self.taxi_out.map(|dt| date_to_string(&dt)).unwrap_or("".to_string()),
             self.departure.clone().map(|d| d.0.ident.to_string()).unwrap_or("".to_string()),
             self.departure.clone().map(|d| date_to_string(&d.1)).unwrap_or("".to_string()),
             self.arrival.clone().map(|a| a.0.ident.to_string()).unwrap_or("".to_string()),
             self.arrival.clone().map(|a| date_to_string(&a.1)).unwrap_or("".to_string()),
             self.shutdown.map(|dt| date_to_string(&dt)).unwrap_or("".to_string()),
-        )
+        ]
     }
-}
-
-#[test]
-fn test_flight_to_csv() {
-    let mut f = Flight::new(&"Test".to_string(), &"PH-CAT".to_string());
-    assert_eq!(f.to_csv(), "Test,PH-CAT,,,,,,");
-
-    let now = Utc::now();
-    f.taxi_out = Some(now);
-    assert_eq!(f.to_csv(), format!("Test,PH-CAT,{},,,,,", date_to_string(&now)));
-
-    f.depart(
-        &Airport { id: 1, ident: "LCPH".to_string(), position: LatLon::new(0., 0.) },
-        &now,
-    );
-    assert_eq!(
-        f.to_csv(),
-        format!("Test,PH-CAT,{0},LCPH,{0},,,", date_to_string(&now))
-    );
-
-    f.arrive(
-        &Airport { id: 1, ident: "LCLK".to_string(), position: LatLon::new(0.,0.) },
-        &now,
-    );
-    assert_eq!(
-        f.to_csv(),
-        format!("Test,PH-CAT,{0},LCPH,{0},LCLK,{0},", date_to_string(&now))
-    );
-
-    f.shutdown = Some(now);
-    assert_eq!(
-        f.to_csv(),
-        format!("Test,PH-CAT,{0},LCPH,{0},LCLK,{0},{0}", date_to_string(&now))
-    );
 }
 
 pub const CSV_HEADER: &str =
@@ -216,7 +181,9 @@ impl Logbook {
     }
 
     fn log(&mut self, flight: &Flight) -> Result<(), Box<dyn Error>> {
-        Ok(writeln!(self.0, "{}", flight.to_csv())?)
+        let mut csv = csv::Writer::from_writer(&self.0);
+        csv.write_record(&flight.to_record())?;
+        Ok(())
     }
 }
 
