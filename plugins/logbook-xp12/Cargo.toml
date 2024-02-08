@@ -7,5 +7,4 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-xplane-sys = { version = "4.0", features = ["XPLM400"] }
 xplm = { version = "0.3" }
