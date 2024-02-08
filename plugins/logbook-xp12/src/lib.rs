@@ -1,13 +1,24 @@
-use std::{io::Write, net::TcpListener};
+use std::{io::Write, net::{TcpListener, TcpStream, SocketAddr}};
 use xplm::data::borrowed::{DataRef, FindError};
 use xplm::data::{ArrayRead, DataRead, ReadOnly, StringRead};
 use xplm::flight_loop::{FlightLoop, FlightLoopCallback, LoopState};
 use xplm::plugin::{Plugin, PluginInfo};
-use xplm::{debugln, xplane_plugin};
+use xplm::xplane_plugin;
+
+/// extension of xplm::debugln! that prints the plugin name before the
+/// log message.
+macro_rules! debugln {
+    () => (xplm::debugln!());
+    ($($arg:tt)*) => ({
+        xplm::debugln!("[Logbook]: {}", std::format_args!($($arg)*))
+    });
+}
+
+pub const SERVER_ADDR: &str = "127.0.0.1:52000";
 
 struct FlightLoopHandler {
     tcp_listener: std::net::TcpListener,
-    tcp_connections: Vec<std::net::TcpStream>,
+    tcp_connections: Vec<(TcpStream, SocketAddr)>,
     is_in_replay: DataRef<bool, ReadOnly>,
     // datarefs for transfer
     latitude: DataRef<f64, ReadOnly>,
@@ -21,9 +32,12 @@ struct FlightLoopHandler {
 
 impl FlightLoopHandler {
     fn new() -> Result<Self, FindError> {
-        // TODO: handle errors
-        let tcp_listener = TcpListener::bind("127.0.0.1:52000").unwrap();
-        tcp_listener.set_nonblocking(true).unwrap();
+        // these should basically never happen, so its fine if the plugin aborts
+        let tcp_listener = TcpListener::bind(SERVER_ADDR)
+            .expect(&format!("failed to open TCP server on {SERVER_ADDR}"));
+        tcp_listener.set_nonblocking(true).expect("set_nonblocking failed");
+
+        debugln!("TCP server listening on {SERVER_ADDR}...");
 
         Ok(Self {
             tcp_listener,
@@ -58,42 +72,50 @@ impl FlightLoopHandler {
             .any(|x| *x == 1)
             .to_string();
         let on_ground = self.on_ground.get().to_string();
+        // TODO: consider using a better format where field order doesn't matter
+        // OR create a new type that's shared between this and the main software
+        // that has the same serialization/deserialization methods as this.
         vec![icao, name, reg, lat, lon, engine_on, on_ground]
     }
 }
 
+// NOTE: be careful! we can't panic here, it will crash the sim.
+//
+// in other places of the code we can panic just fine, xplm will handle it.
 impl FlightLoopCallback for FlightLoopHandler {
     fn flight_loop(&mut self, _: &mut LoopState) {
         if self.is_in_replay.get() {
             // dont do anything if we're replaying, it will break the logging
-            debugln!("Entered replay mode, pausing transmissions.");
+            debugln!("entered replay mode, pausing transmissions.");
             return;
         }
 
         match self.tcp_listener.accept() {
             Ok((socket, addr)) => {
-                debugln!("new client: {addr:?}");
-                socket.set_nonblocking(true).unwrap();
-                self.tcp_connections.push(socket);
+                debugln!("{addr} connected!");
+                if socket.set_nonblocking(true).is_ok() {
+                    self.tcp_connections.push((socket, addr));
+                } else {
+                    // should also basically never happen, but we want to be sure
+                    // never to panic here
+                    debugln!("{addr} WARNING!!! failed to set TCP socket to non_blocking, will ignore the connection");
+                }
             }
             Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {},
-            Err(e) => debugln!("IO error: {e}"),
+            Err(e) => debugln!("could not open listener: {e}"),
         }
 
         let record_line = format!("{}\r\n", self.as_record().join(","));
-        self.tcp_connections.retain_mut(|stream| {
+        self.tcp_connections.retain_mut(|(stream, addr)| {
             match stream.write_all(record_line.as_bytes()) {
-                Ok(_) => {
-                    debugln!("Wrote to stream: {stream:?}");
-                    true
-                },
+                Ok(_) => true,
                 // client closed connection
                 Err(ref e) if e.kind() == std::io::ErrorKind::ConnectionAborted => {
-                    debugln!("Client closed connection...");
+                    debugln!("{addr} closed connection...");
                     false
                 }
                 Err(e) => {
-                    debugln!("TCP client error: {e}");
+                    debugln!("{addr} client error: {e}");
                     false
                 }
             }
@@ -109,7 +131,7 @@ impl Plugin for LogbookPlugin {
     type Error = FindError;
 
     fn start() -> Result<Self, Self::Error> {
-        debugln!("Logbook plugin started.");
+        debugln!("plugin started!");
         let flight_loop = FlightLoop::new(FlightLoopHandler::new()?);
         Ok(LogbookPlugin { flight_loop, })
     }
