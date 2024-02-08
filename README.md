@@ -44,6 +44,38 @@ After the navdata has been generated we can copy it over and run the logbook.
 > logbook.exe
 ```
 
+## X-Plane 12
+
+**WIP**
+
+### Building
+
+```
+> cargo build --release
+> cargo install
+```
+
+### Installing the X-Plane plugin
+
+```
+> cp target/release/logbook_xp12.dll C:\My X-Plane Dir\Resources\plugins\logbook.xpl
+```
+
+### Running
+
+First we need to generate the navdata for X-Plane.
+
+```
+> navdatareader.exe -f XP11
+```
+
+We can then copy it over and run the logbook.
+
+```
+> cp C:\NavDataReader\navdata.sql
+> logbook.exe -f XP11
+```
+
 ## License
 
 [GPLv3](LICENSE)
