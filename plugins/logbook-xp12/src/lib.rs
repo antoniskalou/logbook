@@ -1,5 +1,6 @@
 use xplm::data::borrowed::{DataRef, FindError};
 use xplm::data::{ArrayRead, DataRead, ReadOnly, StringRead};
+use xplm::flight_loop::{FlightLoop, LoopState};
 use xplm::plugin::{Plugin, PluginInfo};
 use xplm::{debug, xplane_plugin};
 
@@ -11,6 +12,7 @@ struct LogbookPlugin {
     registration: DataRef<[u8], ReadOnly>,
     engine_on: DataRef<[i32], ReadOnly>,
     on_ground: DataRef<bool, ReadOnly>,
+    flight_loop: FlightLoop,
 }
 
 impl Plugin for LogbookPlugin {
@@ -18,6 +20,10 @@ impl Plugin for LogbookPlugin {
 
     fn start() -> Result<Self, Self::Error> {
         debug("Hello from logbook\n");
+        let handler = |_: &mut LoopState| {
+            debug("Flight loop callback running\n");
+        };
+        let flight_loop = FlightLoop::new(handler);
         Ok(LogbookPlugin {
             latitude: DataRef::find("sim/flightmodel/position/latitude")?,
             longitude: DataRef::find("sim/flightmodel/position/longitude")?,
@@ -27,10 +33,13 @@ impl Plugin for LogbookPlugin {
             engine_on: DataRef::find("sim/flightmodel/engine/ENGN_running")?,
             // according to the docs: "User Aircraft is on the ground when this is set to 1"
             on_ground: DataRef::find("sim/flightmodel/failures/onground_any")?,
+            flight_loop,
         })
     }
 
     fn enable(&mut self) -> Result<(), Self::Error> {
+        self.flight_loop.schedule_after(std::time::Duration::from_secs(1));
+
         debug(format!("Latitude: {}\n", self.latitude.get()));
         debug(format!("Longitude: {}\n", self.longitude.get()));
 
@@ -50,6 +59,10 @@ impl Plugin for LogbookPlugin {
         debug(format!("On ground? {}\n", self.on_ground.get()));
 
         Ok(())
+    }
+
+    fn disable(&mut self) {
+        self.flight_loop.deactivate();
     }
 
     fn info(&self) -> PluginInfo {
