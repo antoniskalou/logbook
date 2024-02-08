@@ -1,0 +1,11 @@
+[package]
+name = "logbook-xp12"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+xplane-sys = { version = "4.0", features = ["XPLM400"] }
+xplm = { version = "0.3" }
