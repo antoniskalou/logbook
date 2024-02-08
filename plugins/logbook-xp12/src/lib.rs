@@ -34,7 +34,7 @@ impl FlightLoopHandler {
     fn new() -> Result<Self, FindError> {
         // these should basically never happen, so its fine if the plugin aborts
         let tcp_listener = TcpListener::bind(SERVER_ADDR)
-            .expect(&format!("failed to open TCP server on {SERVER_ADDR}"));
+            .unwrap_or_else(|_| panic!("failed to open TCP server on {SERVER_ADDR}"));
         tcp_listener.set_nonblocking(true).expect("set_nonblocking failed");
 
         debugln!("TCP server listening on {SERVER_ADDR}...");
