@@ -7,4 +7,5 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-xplm = { version = "0.3" }
+# use git commit until new version is released
+xplm = { git = "https://github.com/samcrow/rust-xplm", rev = "80badae" }

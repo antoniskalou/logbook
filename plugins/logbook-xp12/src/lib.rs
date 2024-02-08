@@ -3,7 +3,7 @@ use xplm::data::borrowed::{DataRef, FindError};
 use xplm::data::{ArrayRead, DataRead, ReadOnly, StringRead};
 use xplm::flight_loop::{FlightLoop, FlightLoopCallback, LoopState};
 use xplm::plugin::{Plugin, PluginInfo};
-use xplm::{debug, xplane_plugin};
+use xplm::{debugln, xplane_plugin};
 
 struct FlightLoopHandler {
     tcp_listener: std::net::TcpListener,
@@ -66,34 +66,34 @@ impl FlightLoopCallback for FlightLoopHandler {
     fn flight_loop(&mut self, _: &mut LoopState) {
         if self.is_in_replay.get() {
             // dont do anything if we're replaying, it will break the logging
-            debug("Entered replay mode, pausing transmissions.\n");
+            debugln!("Entered replay mode, pausing transmissions.");
             return;
         }
 
         match self.tcp_listener.accept() {
             Ok((socket, addr)) => {
-                debug(format!("new client: {addr:?}\n"));
+                debugln!("new client: {addr:?}");
                 socket.set_nonblocking(true).unwrap();
                 self.tcp_connections.push(socket);
             }
             Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {},
-            Err(e) => debug(format!("IO error: {e}\n")),
+            Err(e) => debugln!("IO error: {e}"),
         }
 
         let record_line = format!("{}\r\n", self.as_record().join(","));
         self.tcp_connections.retain_mut(|stream| {
             match stream.write_all(record_line.as_bytes()) {
                 Ok(_) => {
-                    debug(format!("Wrote to stream: {stream:?}\n"));
+                    debugln!("Wrote to stream: {stream:?}");
                     true
                 },
                 // client closed connection
                 Err(ref e) if e.kind() == std::io::ErrorKind::ConnectionAborted => {
-                    debug("Client closed connection...\n");
+                    debugln!("Client closed connection...");
                     false
                 }
                 Err(e) => {
-                    debug(format!("TCP client error: {e}"));
+                    debugln!("TCP client error: {e}");
                     false
                 }
             }
@@ -109,7 +109,7 @@ impl Plugin for LogbookPlugin {
     type Error = FindError;
 
     fn start() -> Result<Self, Self::Error> {
-        debug("Logbook plugin started.\n");
+        debugln!("Logbook plugin started.");
         let flight_loop = FlightLoop::new(FlightLoopHandler::new()?);
         Ok(LogbookPlugin { flight_loop, })
     }
