@@ -148,7 +148,7 @@ impl Logbook {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let navdata = rusqlite::Connection::open("navdata/msfs.sqlite")?;
+    let navdata = rusqlite::Connection::open("navdata/xp12.sqlite")?;
     navdata.execute("
         create virtual table if not exists airport_coords using rtree(
             airport_id, left_lonx, right_lonx, bottom_laty, top_laty
@@ -159,7 +159,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             select airport_id, left_lonx, right_lonx, bottom_laty, top_laty from airport
     ", ())?;
 
-    let mut sim = msfs::Msfs::connect();
+    let mut sim = xplane::Xplane::connect()?;
     let mut logbook = Logbook::new(Path::new("logbook.csv"))?;
     let mut current_flight: Option<Flight> = None;
     loop {

@@ -8,8 +8,9 @@ pub struct Xplane(TcpStream);
 
 impl Xplane {
     pub fn connect() -> Result<Self, std::io::Error> {
+        // todo: attempt reconnect if closed
         let conn = TcpStream::connect(SERVER_ADDR)?;
-        conn.set_read_timeout(Some(Duration::from_millis(100)))?;
+        // conn.set_read_timeout(Some(Duration::from_millis(1000)))?;
         Ok(Xplane(conn))
     }
 }
@@ -18,13 +19,17 @@ impl SimConnection for Xplane {
     type Error = std::io::Error;
 
     fn next_message(&mut self) -> Result<SimMessage, Self::Error> {
-        let mut buf = String::from("");
-        let _ = self.0.read_to_string(&mut buf)?;
-        let messages = buf.split_terminator("\r\n");
+        let mut buf = [0; 256];
+        let _ = self.0.read(&mut buf)?;
+        println!("Read buf: {buf:?}");
+        let c_str = std::ffi::CStr::from_bytes_until_nul(&buf).unwrap();
+        let str = String::from(c_str.to_str().unwrap());
+        let messages = str.split_terminator("\r\n");
         // todo: properly parse all messages
         let msg = messages.last().unwrap();
+        println!("Received message: {msg:?}");
         let sim_data = SimData::from_csv(msg).unwrap();
-        Ok(SimMessage::Unknown)
+        Ok(SimMessage::SimData(Aircraft::from(sim_data)))
     }
 }
 
@@ -73,7 +78,7 @@ impl From<SimData> for Aircraft {
             title: sim_data.name,
             icao: sim_data.icao,
             registration: sim_data.registration,
-            position: LatLon::from_radians(sim_data.latitude, sim_data.longitude),
+            position: LatLon::new(sim_data.latitude, sim_data.longitude),
             engine_on: sim_data.engine_on,
             on_ground: sim_data.on_ground,
         }
