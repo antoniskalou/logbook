@@ -1,73 +1,12 @@
-use std::{error::Error, fs::File, thread, time, path::Path, ptr};
+use std::{error::Error, fs::File, thread, time, path::Path};
 use chrono::{DateTime, Utc};
 use rusqlite::OptionalExtension;
 use geo::LatLon;
-use simconnect::{DispatchResult, SimConnector};
-use crate::sim_string::{SimString, SimStringError};
+use crate::aircraft::Aircraft;
+use crate::msfs::SimMessage;
 
-mod sim_string;
-
-/// All the data we want to fetch from the sim
-// #[derive(Debug)]
-// rust adds padding to the the struct, pack it to avoid adding extra nulls
-#[repr(C, packed)]
-struct RawSimData {
-    // https://docs.flightsimulator.com/html/Programming_Tools/SimVars/Aircraft_SimVars/Aircraft_Misc_Variables.htm
-    title: SimString<128>,
-    eng_combustion_1: f64,
-    eng_combustion_2: f64,
-    eng_combustion_3: f64,
-    eng_combustion_4: f64,
-    latitude: f64,
-    longitude: f64,
-    // https://docs.flightsimulator.com/html/Programming_Tools/SimVars/Miscellaneous_Variables.htm
-    sim_on_ground: f64,
-    // https://docs.flightsimulator.com/html/Programming_Tools/SimVars/Aircraft_SimVars/Aircraft_RadioNavigation_Variables.htm
-    // may or may not contain aircraft registration
-    atc_id: SimString<32>,
-}
-
-#[derive(Clone, Debug)]
-struct Aircraft {
-    title: String,
-    icao: String,
-    position: LatLon,
-    registration: String,
-    engines_on: [bool; 4],
-    on_ground: bool,
-}
-
-impl Aircraft {
-    fn any_engine_on(&self) -> bool {
-        self.engines_on.contains(&true)
-    }
-}
-
-impl TryFrom<RawSimData> for Aircraft {
-    type Error = SimStringError;
-
-    fn try_from(raw: RawSimData) -> Result<Self, Self::Error> {
-        Ok(Self {
-            title: raw.title.to_string()?,
-            // FIXME: ICAO isn't available from simconnect yet.
-            //
-            // a possible option is to do a lookup for the aircraft (using the title)
-            // in the Community & Official folders, finding the aircraft.cfg and fetching
-            // icao_type_designator
-            icao: String::from("N/A"),
-            position: LatLon::from_radians(raw.latitude, raw.longitude),
-            // not the most reliable source, but its the best we have
-            registration: raw.atc_id.to_string()?,
-            engines_on: [
-                raw.eng_combustion_1 != 0.0,
-                raw.eng_combustion_2 != 0.0,
-                raw.eng_combustion_3 != 0.0,
-                raw.eng_combustion_4 != 0.0,
-            ],
-            on_ground: raw.sim_on_ground != 0.0,
-        })
-    }
-}
+mod aircraft;
+mod msfs;
 
 // some fields aren't used, but are useful for debugging
 #[allow(dead_code)]
@@ -218,156 +157,64 @@ fn main() -> Result<(), Box<dyn Error>> {
             select airport_id, left_lonx, right_lonx, bottom_laty, top_laty from airport
     ", ())?;
 
-    let mut conn = SimConnector::new();
-    conn.connect("Logbook");
-    conn.add_data_definition(
-        0,
-        "TITLE",
-        "",
-        simconnect::SIMCONNECT_DATATYPE_SIMCONNECT_DATATYPE_STRING128,
-        u32::MAX,
-        0.0
-    );
-    conn.add_data_definition(
-        0,
-        "ENG COMBUSTION:1",
-        "Boolean",
-        simconnect::SIMCONNECT_DATATYPE_SIMCONNECT_DATATYPE_FLOAT64,
-        u32::MAX,
-        0.0
-    );
-    conn.add_data_definition(
-        0,
-        "ENG COMBUSTION:2",
-        "Boolean",
-        simconnect::SIMCONNECT_DATATYPE_SIMCONNECT_DATATYPE_FLOAT64,
-        u32::MAX,
-        0.0
-    );
-    conn.add_data_definition(
-        0,
-        "ENG COMBUSTION:3",
-        "Boolean",
-        simconnect::SIMCONNECT_DATATYPE_SIMCONNECT_DATATYPE_FLOAT64,
-        u32::MAX,
-        0.0
-    );
-    conn.add_data_definition(
-        0,
-        "ENG COMBUSTION:4",
-        "Boolean",
-        simconnect::SIMCONNECT_DATATYPE_SIMCONNECT_DATATYPE_FLOAT64,
-        u32::MAX,
-        0.0
-    );
-    conn.add_data_definition(
-        0,
-        "PLANE LATITUDE",
-        "Radians",
-        simconnect::SIMCONNECT_DATATYPE_SIMCONNECT_DATATYPE_FLOAT64,
-        u32::MAX,
-        0.0
-    );
-    conn.add_data_definition(
-        0,
-        "PLANE LONGITUDE",
-        "Radians",
-        simconnect::SIMCONNECT_DATATYPE_SIMCONNECT_DATATYPE_FLOAT64,
-        u32::MAX,
-        0.0
-    );
-    conn.add_data_definition(
-        0,
-        "SIM ON GROUND",
-        "Boolean",
-        simconnect::SIMCONNECT_DATATYPE_SIMCONNECT_DATATYPE_FLOAT64,
-        u32::MAX,
-        0.0
-    );
-    conn.add_data_definition(
-        0,
-        "ATC ID",
-        "",
-        simconnect::SIMCONNECT_DATATYPE_SIMCONNECT_DATATYPE_STRING32,
-        u32::MAX,
-        0.0
-    );
-
-    // receive data related to the user aircraft
-    conn.request_data_on_sim_object(
-        0, // request id
-        0, // define id
-        0, // object id (user)
-        simconnect::SIMCONNECT_PERIOD_SIMCONNECT_PERIOD_SECOND,
-        0, // flags
-        0, // origin
-        0, // interval
-        0, // limit
-    );
-
+    let msfs = msfs::MSFS::connect();
     let mut logbook = Logbook::new(Path::new("logbook.csv"))?;
     let mut current_flight: Option<Flight> = None;
     loop {
-        match conn.get_next_message() {
-            Ok(DispatchResult::SimObjectData(data)) => unsafe {
-                if data.dwDefineID == 0 {
-                    let sim_data_ptr = ptr::addr_of!(data.dwData) as *const RawSimData;
-                    let sim_data_value = ptr::read_unaligned(sim_data_ptr);
-                    let aircraft = Aircraft::try_from(sim_data_value).unwrap();
+        match msfs.next_message() {
+            Ok(SimMessage::SimData(aircraft)) => {
+                let closest_airport = search_within(&navdata, aircraft.position)?;
 
-                    let closest_airport = search_within(&navdata, aircraft.position)?;
+                // initialize current flight if there isn't one
+                if current_flight.is_none() {
+                    current_flight = Some(Flight::new(&aircraft));
+                }
 
-                    // initialize current flight if there isn't one
-                    if current_flight.is_none() {
-                        current_flight = Some(Flight::new(&aircraft));
+                let flight = current_flight.as_mut().unwrap();
+                println!("{:?}", flight);
+                match flight.state {
+                    FlightState::Preflight => {
+                        if aircraft.any_engine_on() {
+                            flight.taxi_out = Some(Utc::now());
+                            flight.state = FlightState::Taxi;
+                        }
                     }
-
-                    let flight = current_flight.as_mut().unwrap();
-                    println!("{:?}", flight);
-                    match flight.state {
-                        FlightState::Preflight => {
-                            if aircraft.any_engine_on() {
-                                flight.taxi_out = Some(Utc::now());
-                                flight.state = FlightState::Taxi;
-                            }
+                    FlightState::Taxi => {
+                        if !aircraft.on_ground {
+                            let airport = closest_airport.expect("invalid takeoff airport");
+                            flight.depart(&airport, &Utc::now());
+                            flight.state = FlightState::EnRoute;
                         }
-                        FlightState::Taxi => {
-                            if !aircraft.on_ground {
-                                let airport = closest_airport.expect("invalid takeoff airport");
-                                flight.depart(&airport, &Utc::now());
-                                flight.state = FlightState::EnRoute;
-                            }
+                    }
+                    FlightState::EnRoute => {
+                        if aircraft.on_ground {
+                            let airport = closest_airport.expect("invalid landing airport");
+                            flight.arrive(&airport, &Utc::now());
+                            flight.state = FlightState::Landed;
                         }
-                        FlightState::EnRoute => {
-                            if aircraft.on_ground {
-                                let airport = closest_airport.expect("invalid landing airport");
-                                flight.arrive(&airport, &Utc::now());
-                                flight.state = FlightState::Landed;
-                            }
+                    }
+                    FlightState::Landed => {
+                        if !aircraft.on_ground {
+                            // did a touch and go or a go around
+                            flight.state = FlightState::EnRoute;
+                        } else if !aircraft.any_engine_on() {
+                            flight.shutdown = Some(Utc::now());
+                            flight.state = FlightState::Complete;
                         }
-                        FlightState::Landed => {
-                            if !aircraft.on_ground {
-                                // did a touch and go or a go around
-                                flight.state = FlightState::EnRoute;
-                            } else if !aircraft.any_engine_on() {
-                                flight.shutdown = Some(Utc::now());
-                                flight.state = FlightState::Complete;
-                            }
-                        }
-                        FlightState::Complete => {
-                            println!("Flight completed!");
-                            // store record
-                            logbook.log(flight)?;
-                            // reset flight
-                            current_flight = None;
-                        }
+                    }
+                    FlightState::Complete => {
+                        println!("Flight completed!");
+                        // store record
+                        logbook.log(flight)?;
+                        // reset flight
+                        current_flight = None;
                     }
                 }
             }
-            Ok(DispatchResult::Open(_)) => {
+            Ok(SimMessage::Open) => {
                 println!("Simulator connection established.")
             }
-            Ok(DispatchResult::Quit(_)) => {
+            Ok(SimMessage::Quit) => {
                 println!("Simulator connection closed.");
             }
             msg => eprintln!("Unhandled message received: {:?}", msg),
