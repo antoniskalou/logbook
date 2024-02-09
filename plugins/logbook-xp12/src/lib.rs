@@ -21,11 +21,11 @@ struct FlightLoopHandler {
     tcp_connections: Vec<(TcpStream, SocketAddr)>,
     is_in_replay: DataRef<bool, ReadOnly>,
     // datarefs for transfer
-    latitude: DataRef<f64, ReadOnly>,
-    longitude: DataRef<f64, ReadOnly>,
     icao: DataRef<[u8], ReadOnly>,
     name: DataRef<[u8], ReadOnly>,
     registration: DataRef<[u8], ReadOnly>,
+    latitude: DataRef<f64, ReadOnly>,
+    longitude: DataRef<f64, ReadOnly>,
     engine_on: DataRef<[i32], ReadOnly>,
     on_ground: DataRef<bool, ReadOnly>,
 }
@@ -43,11 +43,11 @@ impl FlightLoopHandler {
             tcp_listener,
             tcp_connections: vec![],
             is_in_replay: DataRef::find("sim/time/is_in_replay")?,
-            latitude: DataRef::find("sim/flightmodel/position/latitude")?,
-            longitude: DataRef::find("sim/flightmodel/position/longitude")?,
             icao: DataRef::find("sim/aircraft/view/acf_ICAO")?,
             name: DataRef::find("sim/aircraft/view/acf_ui_name")?,
             registration: DataRef::find("sim/aircraft/view/acf_tailnum")?,
+            latitude: DataRef::find("sim/flightmodel/position/latitude")?,
+            longitude: DataRef::find("sim/flightmodel/position/longitude")?,
             engine_on: DataRef::find("sim/flightmodel/engine/ENGN_running")?,
             // according to the docs: "User Aircraft is on the ground when this is set to 1"
             on_ground: DataRef::find("sim/flightmodel/failures/onground_any")?,

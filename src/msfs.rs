@@ -78,6 +78,13 @@ impl TryFrom<RawSimData> for Aircraft {
     type Error = SimStringError;
 
     fn try_from(raw: RawSimData) -> Result<Self, Self::Error> {
+        let engine_on = [
+            raw.eng_combustion_1,
+            raw.eng_combustion_2,
+            raw.eng_combustion_3,
+            raw.eng_combustion_4,
+        ].iter().any(|x| *x != 0.0);
+
         Ok(Self {
             title: raw.title.to_string()?,
             // FIXME: ICAO isn't available from simconnect yet.
@@ -89,12 +96,7 @@ impl TryFrom<RawSimData> for Aircraft {
             position: LatLon::from_radians(raw.latitude, raw.longitude),
             // not the most reliable source, but its the best we have
             registration: raw.atc_id.to_string()?,
-            engines_on: [
-                raw.eng_combustion_1 != 0.0,
-                raw.eng_combustion_2 != 0.0,
-                raw.eng_combustion_3 != 0.0,
-                raw.eng_combustion_4 != 0.0,
-            ],
+            engine_on,
             on_ground: raw.sim_on_ground != 0.0,
         })
     }
@@ -197,7 +199,7 @@ impl Msfs {
 impl SimConnection for Msfs {
     type Error = String;
 
-    fn next_message(&self) -> Result<crate::sim_connection::SimMessage, Self::Error> {
+    fn next_message(&mut self) -> Result<crate::sim_connection::SimMessage, Self::Error> {
         let msg = match self.0.get_next_message()? {
             DispatchResult::Open(_) => SimMessage::Open,
             DispatchResult::Quit(_) => SimMessage::Quit,

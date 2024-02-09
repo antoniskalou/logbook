@@ -11,5 +11,5 @@ pub enum SimMessage {
 pub trait SimConnection {
     type Error;
 
-    fn next_message(&self) -> Result<SimMessage, Self::Error>;
+    fn next_message(&mut self) -> Result<SimMessage, Self::Error>;
 }

@@ -6,12 +6,6 @@ pub struct Aircraft {
     pub icao: String,
     pub registration: String,
     pub position: LatLon,
-    pub engines_on: [bool; 4],
+    pub engine_on: bool,
     pub on_ground: bool,
-}
-
-impl Aircraft {
-    pub fn any_engine_on(&self) -> bool {
-        self.engines_on.contains(&true)
-    }
 }

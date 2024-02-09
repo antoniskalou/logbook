@@ -7,6 +7,7 @@ use crate::sim_connection::{SimConnection, SimMessage};
 
 mod aircraft;
 mod msfs;
+mod xplane;
 mod sim_connection;
 
 // some fields aren't used, but are useful for debugging
@@ -158,11 +159,11 @@ fn main() -> Result<(), Box<dyn Error>> {
             select airport_id, left_lonx, right_lonx, bottom_laty, top_laty from airport
     ", ())?;
 
-    let msfs = msfs::Msfs::connect();
+    let mut sim = msfs::Msfs::connect();
     let mut logbook = Logbook::new(Path::new("logbook.csv"))?;
     let mut current_flight: Option<Flight> = None;
     loop {
-        match msfs.next_message() {
+        match sim.next_message() {
             Ok(SimMessage::SimData(aircraft)) => {
                 // initialize current flight if there isn't one
                 if current_flight.is_none() {
@@ -174,7 +175,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 println!("{:?}", flight);
                 match flight.state {
                     FlightState::Preflight => {
-                        if aircraft.any_engine_on() {
+                        if aircraft.engine_on {
                             flight.taxi_out = Some(Utc::now());
                             flight.state = FlightState::Taxi;
                         }
@@ -197,7 +198,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                         if !aircraft.on_ground {
                             // did a touch and go or a go around
                             flight.state = FlightState::EnRoute;
-                        } else if !aircraft.any_engine_on() {
+                        } else if !aircraft.engine_on {
                             flight.shutdown = Some(Utc::now());
                             flight.state = FlightState::Complete;
                         }
