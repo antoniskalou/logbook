@@ -207,7 +207,7 @@ impl Logbook {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let navdata = rusqlite::Connection::open("navdata.sqlite")?;
+    let navdata = rusqlite::Connection::open("navdata/msfs.sqlite")?;
     navdata.execute("
         create virtual table if not exists airport_coords using rtree(
             airport_id, left_lonx, right_lonx, bottom_laty, top_laty

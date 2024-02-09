@@ -31,7 +31,7 @@ A CLI based logger for flight simulators.
 
 ### Running
 
-To run the logbook you need to generate a `navdata.sql` file first with [navdatareader][1]:
+To run the logbook you need to generate a `navdata.sqlite` file first with [navdatareader][1]:
 
 ```
 > navdatareader.exe -f MSFS
@@ -40,8 +40,8 @@ To run the logbook you need to generate a `navdata.sql` file first with [navdata
 After the navdata has been generated we can copy it over and run the logbook.
 
 ```
-> cp C:\NavDataReader\navdata.sql .
-> logbook.exe
+> cp C:\NavDataReader\navdata.sql .\navdata\msfs.sqlite
+> logbook.exe -f MSFS
 ```
 
 ## X-Plane 12
@@ -72,7 +72,7 @@ First we need to generate the navdata for X-Plane.
 We can then copy it over and run the logbook.
 
 ```
-> cp C:\NavDataReader\navdata.sql
+> cp C:\NavDataReader\navdata.sql .\navdata\xp.sqlite
 > logbook.exe -f XP11
 ```
 
