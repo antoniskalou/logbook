@@ -1,4 +1,4 @@
-workspace = { members = ["lib/geo", "plugins/logbook-xp12"] }
+workspace = { members = ["bench/xp_client_connections", "lib/geo", "plugins/logbook-xp12"] }
 [package]
 name = "logbook"
 version = "0.1.0"
