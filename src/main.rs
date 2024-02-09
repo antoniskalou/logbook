@@ -1,4 +1,4 @@
-use std::{error::Error, fs::File, thread, time, path::Path, ptr, io::Write};
+use std::{error::Error, fs::File, thread, time, path::Path, ptr};
 use chrono::{DateTime, Utc};
 use rusqlite::OptionalExtension;
 use geo::LatLon;
@@ -30,6 +30,7 @@ struct RawSimData {
 #[derive(Clone, Debug)]
 struct Aircraft {
     title: String,
+    icao: String,
     position: LatLon,
     registration: String,
     engines_on: [bool; 4],
@@ -48,8 +49,14 @@ impl TryFrom<RawSimData> for Aircraft {
     fn try_from(raw: RawSimData) -> Result<Self, Self::Error> {
         Ok(Self {
             title: raw.title.to_string()?,
+            // FIXME: ICAO isn't available from simconnect yet.
+            //
+            // a possible option is to do a lookup for the aircraft (using the title)
+            // in the Community & Official folders, finding the aircraft.cfg and fetching
+            // icao_type_designator
+            icao: String::from("N/A"),
             position: LatLon::from_radians(raw.latitude, raw.longitude),
-            // TODO: consider fetching data from other sources first
+            // not the most reliable source, but its the best we have
             registration: raw.atc_id.to_string()?,
             engines_on: [
                 raw.eng_combustion_1 != 0.0,
@@ -115,8 +122,7 @@ enum FlightState {
 
 #[derive(Clone, Debug)]
 struct Flight {
-    aircraft: String,
-    registration: String,
+    aircraft: Aircraft,
     state: FlightState,
     taxi_out: Option<DateTime<Utc>>,
     departure: Option<(Airport, DateTime<Utc>)>,
@@ -125,10 +131,9 @@ struct Flight {
 }
 
 impl Flight {
-    fn new(aircraft: &str, registration: &str) -> Self {
+    fn new(aircraft: &Aircraft) -> Self {
         Flight {
-            aircraft: aircraft.to_owned(),
-            registration: registration.to_owned(),
+            aircraft: aircraft.clone(),
             state: FlightState::Preflight,
             taxi_out: None,
             departure: None,
@@ -147,8 +152,9 @@ impl Flight {
 
     fn to_record(&self) -> Vec<Option<String>> {
         vec![
-            Some(self.aircraft.clone()),
-            Some(self.registration.clone()),
+            Some(self.aircraft.title.clone()),
+            Some(self.aircraft.icao.clone()),
+            Some(self.aircraft.registration.clone()),
             self.taxi_out.map(|dt| date_to_string(&dt)),
             self.departure.clone().map(|d| d.0.ident),
             self.departure.clone().map(|d| date_to_string(&d.1)),
@@ -159,8 +165,9 @@ impl Flight {
     }
 }
 
-pub const CSV_HEADER: [&str; 8] = [
-    "Aircraft",
+pub const CSV_HEADER: [&str; 9] = [
+    "Aircraft Name",
+    "Aircraft ICAO",
     "Registration",
     "Taxi Time",
     "Departure ICAO",
@@ -312,7 +319,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
                     // initialize current flight if there isn't one
                     if current_flight.is_none() {
-                        current_flight = Some(Flight::new(&aircraft.title, &aircraft.registration));
+                        current_flight = Some(Flight::new(&aircraft));
                     }
 
                     let flight = current_flight.as_mut().unwrap();
