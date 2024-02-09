@@ -3,10 +3,11 @@ use chrono::{DateTime, Utc};
 use rusqlite::OptionalExtension;
 use geo::LatLon;
 use crate::aircraft::Aircraft;
-use crate::msfs::SimMessage;
+use crate::sim_connection::{SimConnection, SimMessage};
 
 mod aircraft;
 mod msfs;
+mod sim_connection;
 
 // some fields aren't used, but are useful for debugging
 #[allow(dead_code)]
@@ -157,19 +158,18 @@ fn main() -> Result<(), Box<dyn Error>> {
             select airport_id, left_lonx, right_lonx, bottom_laty, top_laty from airport
     ", ())?;
 
-    let msfs = msfs::MSFS::connect();
+    let msfs = msfs::Msfs::connect();
     let mut logbook = Logbook::new(Path::new("logbook.csv"))?;
     let mut current_flight: Option<Flight> = None;
     loop {
         match msfs.next_message() {
             Ok(SimMessage::SimData(aircraft)) => {
-                let closest_airport = search_within(&navdata, aircraft.position)?;
-
                 // initialize current flight if there isn't one
                 if current_flight.is_none() {
                     current_flight = Some(Flight::new(&aircraft));
                 }
 
+                let closest_airport = search_within(&navdata, aircraft.position)?;
                 let flight = current_flight.as_mut().unwrap();
                 println!("{:?}", flight);
                 match flight.state {

@@ -1,7 +1,8 @@
 use std::{ffi, str, ptr};
 use geo::LatLon;
-use simconnect::{DispatchResult, SimConnector};
+use simconnect::DispatchResult;
 use crate::aircraft::Aircraft;
+use crate::sim_connection::{SimConnection, SimMessage};
 
 #[derive(Debug)]
 enum SimStringError {
@@ -99,19 +100,11 @@ impl TryFrom<RawSimData> for Aircraft {
     }
 }
 
-#[derive(Debug)]
-pub enum SimMessage {
-    Open,
-    Quit,
-    SimData(Aircraft),
-    Unknown,
-}
+pub struct Msfs(simconnect::SimConnector);
 
-pub struct MSFS(SimConnector);
-
-impl MSFS {
+impl Msfs {
     pub fn connect() -> Self {
-        let mut conn = SimConnector::new();
+        let mut conn = simconnect::SimConnector::new();
         conn.connect("Logbook");
         conn.add_data_definition(
             0,
@@ -199,8 +192,12 @@ impl MSFS {
         );
         Self(conn)
     }
+}
 
-    pub fn next_message(&self) -> Result<SimMessage, &str> {
+impl SimConnection for Msfs {
+    type Error = String;
+
+    fn next_message(&self) -> Result<crate::sim_connection::SimMessage, Self::Error> {
         let msg = match self.0.get_next_message()? {
             DispatchResult::Open(_) => SimMessage::Open,
             DispatchResult::Quit(_) => SimMessage::Quit,
