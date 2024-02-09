@@ -38,7 +38,7 @@ pub struct SimString<const N: usize>([u8; N]);
 impl<const N: usize> SimString<N> {
     pub fn to_string(&self) -> Result<String, SimStringError> {
         let bytes = self.0;
-        let c_str = ffi::CStr::from_bytes_until_nul(&bytes).unwrap();
+        let c_str = ffi::CStr::from_bytes_until_nul(&bytes)?;
         Ok(String::from(c_str.to_str()?))
     }
 }
