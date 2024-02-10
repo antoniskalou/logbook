@@ -1,8 +1,8 @@
-use std::{ffi, str, ptr, thread, time};
-use geo::LatLon;
-use simconnect::DispatchResult;
 use crate::aircraft::Aircraft;
 use crate::sim_connection::{SimConnection, SimMessage};
+use geo::LatLon;
+use simconnect::DispatchResult;
+use std::{ffi, ptr, str, thread, time};
 
 #[derive(Debug)]
 enum SimStringError {
@@ -53,7 +53,6 @@ impl<const N: usize> std::fmt::Display for SimString<N> {
     }
 }
 
-
 /// All the data we want to fetch from the sim
 // #[derive(Debug)]
 // rust adds padding to the the struct, pack it to avoid adding extra nulls
@@ -83,7 +82,9 @@ impl TryFrom<RawSimData> for Aircraft {
             raw.eng_combustion_2,
             raw.eng_combustion_3,
             raw.eng_combustion_4,
-        ].iter().any(|x| *x != 0.0);
+        ]
+        .iter()
+        .any(|x| *x != 0.0);
 
         Ok(Self {
             title: raw.title.to_string()?,
@@ -114,7 +115,7 @@ impl Msfs {
             "",
             simconnect::SIMCONNECT_DATATYPE_SIMCONNECT_DATATYPE_STRING128,
             u32::MAX,
-            0.0
+            0.0,
         );
         conn.add_data_definition(
             0,
@@ -122,7 +123,7 @@ impl Msfs {
             "Boolean",
             simconnect::SIMCONNECT_DATATYPE_SIMCONNECT_DATATYPE_FLOAT64,
             u32::MAX,
-            0.0
+            0.0,
         );
         conn.add_data_definition(
             0,
@@ -130,7 +131,7 @@ impl Msfs {
             "Boolean",
             simconnect::SIMCONNECT_DATATYPE_SIMCONNECT_DATATYPE_FLOAT64,
             u32::MAX,
-            0.0
+            0.0,
         );
         conn.add_data_definition(
             0,
@@ -138,7 +139,7 @@ impl Msfs {
             "Boolean",
             simconnect::SIMCONNECT_DATATYPE_SIMCONNECT_DATATYPE_FLOAT64,
             u32::MAX,
-            0.0
+            0.0,
         );
         conn.add_data_definition(
             0,
@@ -146,7 +147,7 @@ impl Msfs {
             "Boolean",
             simconnect::SIMCONNECT_DATATYPE_SIMCONNECT_DATATYPE_FLOAT64,
             u32::MAX,
-            0.0
+            0.0,
         );
         conn.add_data_definition(
             0,
@@ -154,7 +155,7 @@ impl Msfs {
             "Radians",
             simconnect::SIMCONNECT_DATATYPE_SIMCONNECT_DATATYPE_FLOAT64,
             u32::MAX,
-            0.0
+            0.0,
         );
         conn.add_data_definition(
             0,
@@ -162,7 +163,7 @@ impl Msfs {
             "Radians",
             simconnect::SIMCONNECT_DATATYPE_SIMCONNECT_DATATYPE_FLOAT64,
             u32::MAX,
-            0.0
+            0.0,
         );
         conn.add_data_definition(
             0,
@@ -170,7 +171,7 @@ impl Msfs {
             "Boolean",
             simconnect::SIMCONNECT_DATATYPE_SIMCONNECT_DATATYPE_FLOAT64,
             u32::MAX,
-            0.0
+            0.0,
         );
         conn.add_data_definition(
             0,
@@ -178,7 +179,7 @@ impl Msfs {
             "",
             simconnect::SIMCONNECT_DATATYPE_SIMCONNECT_DATATYPE_STRING32,
             u32::MAX,
-            0.0
+            0.0,
         );
 
         // receive data related to the user aircraft
@@ -220,7 +221,7 @@ impl SimConnection for Msfs {
                 // wait and try again
                 thread::sleep(time::Duration::from_secs(1));
                 self.next_message()?
-            },
+            }
         };
         Ok(msg)
     }

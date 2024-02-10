@@ -1,4 +1,7 @@
-use std::{io::Write, net::{TcpListener, TcpStream, SocketAddr}};
+use std::{
+    io::Write,
+    net::{SocketAddr, TcpListener, TcpStream},
+};
 use xplm::data::borrowed::{DataRef, FindError};
 use xplm::data::{ArrayRead, DataRead, ReadOnly, StringRead};
 use xplm::flight_loop::{FlightLoop, FlightLoopCallback, LoopState};
@@ -35,7 +38,9 @@ impl FlightLoopHandler {
         // these should basically never happen, so its fine if the plugin aborts
         let tcp_listener = TcpListener::bind(SERVER_ADDR)
             .unwrap_or_else(|_| panic!("failed to open TCP server on {SERVER_ADDR}"));
-        tcp_listener.set_nonblocking(true).expect("set_nonblocking failed");
+        tcp_listener
+            .set_nonblocking(true)
+            .expect("set_nonblocking failed");
 
         debugln!("TCP server listening on {SERVER_ADDR}...");
 
@@ -55,22 +60,15 @@ impl FlightLoopHandler {
     }
 
     fn as_record(&self) -> Vec<String> {
-        let icao = self.icao
-            .get_as_string()
-            .unwrap_or(String::from("UNKNOWN"));
-        let name = self.name
-            .get_as_string()
-            .unwrap_or(String::from("UNKNOWN"));
-        let reg = self.registration
+        let icao = self.icao.get_as_string().unwrap_or(String::from("UNKNOWN"));
+        let name = self.name.get_as_string().unwrap_or(String::from("UNKNOWN"));
+        let reg = self
+            .registration
             .get_as_string()
             .unwrap_or(String::from("UNKNOWN"));
         let lat = self.latitude.get().to_string();
         let lon = self.longitude.get().to_string();
-        let engine_on = self.engine_on
-            .as_vec()
-            .iter()
-            .any(|x| *x == 1)
-            .to_string();
+        let engine_on = self.engine_on.as_vec().iter().any(|x| *x == 1).to_string();
         let on_ground = self.on_ground.get().to_string();
         // TODO: consider using a better format where field order doesn't matter
         // OR create a new type that's shared between this and the main software
@@ -101,7 +99,7 @@ impl FlightLoopCallback for FlightLoopHandler {
                     debugln!("{addr} WARNING!!! failed to set TCP socket to non_blocking, will ignore the connection");
                 }
             }
-            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {},
+            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {}
             Err(e) => debugln!("could not open listener: {e}"),
         }
 
@@ -133,11 +131,12 @@ impl Plugin for LogbookPlugin {
     fn start() -> Result<Self, Self::Error> {
         debugln!("plugin started!");
         let flight_loop = FlightLoop::new(FlightLoopHandler::new()?);
-        Ok(LogbookPlugin { flight_loop, })
+        Ok(LogbookPlugin { flight_loop })
     }
 
     fn enable(&mut self) -> Result<(), Self::Error> {
-        self.flight_loop.schedule_after(std::time::Duration::from_secs(1));
+        self.flight_loop
+            .schedule_after(std::time::Duration::from_secs(1));
         Ok(())
     }
 

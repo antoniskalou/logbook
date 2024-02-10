@@ -1,14 +1,14 @@
-use std::{error::Error, fs::File, thread, time, path::Path};
-use chrono::{DateTime, Utc};
-use rusqlite::OptionalExtension;
-use geo::LatLon;
 use crate::aircraft::Aircraft;
 use crate::sim_connection::{SimConnection, SimMessage};
+use chrono::{DateTime, Utc};
+use geo::LatLon;
+use rusqlite::OptionalExtension;
+use std::{error::Error, fs::File, path::Path, thread, time};
 
 mod aircraft;
 mod msfs;
-mod xplane;
 mod sim_connection;
+mod xplane;
 
 // some fields aren't used, but are useful for debugging
 #[allow(dead_code)]
@@ -23,7 +23,8 @@ fn search_within(
     navdata: &rusqlite::Connection,
     origin: LatLon,
 ) -> Result<Option<Airport>, Box<dyn Error>> {
-    let mut stmt = navdata.prepare("
+    let mut stmt = navdata.prepare(
+        "
 select airport_id, ident, laty, lonx
   from airport
   where airport_id in (
@@ -31,19 +32,19 @@ select airport_id, ident, laty, lonx
         left_lonx <= ?1 and right_lonx >= ?1 and
         bottom_laty <= ?2 and top_laty >= ?2
   );
-    ")?;
-    stmt
-        .query_row([origin.longitude(), origin.latitude()], |row| {
-            Ok(Airport {
-                id: row.get(0)?,
-                ident: row.get(1)?,
-                position: LatLon::new(row.get(2)?, row.get(3)?),
-            })
+    ",
+    )?;
+    stmt.query_row([origin.longitude(), origin.latitude()], |row| {
+        Ok(Airport {
+            id: row.get(0)?,
+            ident: row.get(1)?,
+            position: LatLon::new(row.get(2)?, row.get(3)?),
         })
-        // it is acceptable to not receive a record
-        .optional()
-        // convert rusqlite::Error into error::Error
-        .map_err(|e| e.into())
+    })
+    // it is acceptable to not receive a record
+    .optional()
+    // convert rusqlite::Error into error::Error
+    .map_err(|e| e.into())
 }
 
 pub const DATE_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
@@ -123,10 +124,7 @@ struct Logbook(File);
 impl Logbook {
     fn new(path: &Path) -> Result<Self, Box<dyn Error>> {
         let should_add_header = !path.exists();
-        let f = File::options()
-            .create(true)
-            .append(true)
-            .open(path)?;
+        let f = File::options().create(true).append(true).open(path)?;
 
         if should_add_header {
             csv::Writer::from_writer(&f).write_record(CSV_HEADER)?;
@@ -149,15 +147,21 @@ impl Logbook {
 
 fn main() -> Result<(), Box<dyn Error>> {
     let navdata = rusqlite::Connection::open("navdata/xp12.sqlite")?;
-    navdata.execute("
+    navdata.execute(
+        "
         create virtual table if not exists airport_coords using rtree(
             airport_id, left_lonx, right_lonx, bottom_laty, top_laty
         )
-    ", ())?;
-    navdata.execute("
+    ",
+        (),
+    )?;
+    navdata.execute(
+        "
         insert or ignore into airport_coords
             select airport_id, left_lonx, right_lonx, bottom_laty, top_laty from airport
-    ", ())?;
+    ",
+        (),
+    )?;
 
     let mut sim = xplane::Xplane::connect()?;
     let mut logbook = Logbook::new(Path::new("logbook.csv"))?;

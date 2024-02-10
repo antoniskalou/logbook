@@ -124,7 +124,7 @@ impl LatLon {
     pub fn from_radians(lat: f64, lon: f64) -> Self {
         Self {
             lat: lat.to_degrees(),
-            lon: lon.to_degrees()
+            lon: lon.to_degrees(),
         }
     }
 

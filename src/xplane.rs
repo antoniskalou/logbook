@@ -1,6 +1,15 @@
-use std::{collections::VecDeque, ffi, io::{self, Read}, net::TcpStream, time::Duration};
+use crate::{
+    aircraft::Aircraft,
+    sim_connection::{SimConnection, SimMessage},
+};
 use geo::LatLon;
-use crate::{aircraft::Aircraft, sim_connection::{SimConnection, SimMessage}};
+use std::{
+    collections::VecDeque,
+    ffi,
+    io::{self, Read},
+    net::TcpStream,
+    time::Duration,
+};
 
 pub const SERVER_ADDR: &str = "127.0.0.1:52000";
 
@@ -14,23 +23,20 @@ impl Xplane {
         // todo: attempt reconnect if closed
         let conn = TcpStream::connect(SERVER_ADDR)?;
         conn.set_read_timeout(Some(Duration::from_secs(1)))?;
-        Ok(Xplane { conn, queue: VecDeque::new() })
+        Ok(Xplane {
+            conn,
+            queue: VecDeque::new(),
+        })
     }
 
-    fn fetch_messages(
-        &self,
-        buf: &[u8]
-    ) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    fn fetch_messages(&self, buf: &[u8]) -> Result<Vec<String>, Box<dyn std::error::Error>> {
         let str = match ffi::CStr::from_bytes_until_nul(buf) {
             // buffer contains nulls, we can treat it as a CString
             Ok(c_str) => String::from(c_str.to_str()?),
             // buffer has no nulls, read the entire thing
             Err(_) => String::from_utf8_lossy(buf).to_string(),
         };
-        let messages = str
-            .lines()
-            .map(String::from)
-            .collect::<Vec<String>>();
+        let messages = str.lines().map(String::from).collect::<Vec<String>>();
         Ok(messages)
     }
 }
@@ -56,13 +62,9 @@ impl SimConnection for Xplane {
                 // refetch from queue
                 self.next_message()
             }
-            Err(ref e) if e.kind() == io::ErrorKind::TimedOut => {
-                Ok(SimMessage::Waiting)
-            }
-            Err(ref e) if e.kind() == io::ErrorKind::ConnectionAborted => {
-                Ok(SimMessage::Quit)
-            }
-            Err(e) => Err(Box::new(e))
+            Err(ref e) if e.kind() == io::ErrorKind::TimedOut => Ok(SimMessage::Waiting),
+            Err(ref e) if e.kind() == io::ErrorKind::ConnectionAborted => Ok(SimMessage::Quit),
+            Err(e) => Err(Box::new(e)),
         }
     }
 }
@@ -75,7 +77,7 @@ struct SimData {
     latitude: f64,
     longitude: f64,
     engine_on: bool,
-    on_ground: bool
+    on_ground: bool,
 }
 
 impl SimData {
