@@ -1,10 +1,11 @@
-workspace = { members = ["lib/geo", "plugins/logbook-xp12"] }
+workspace = { members = ["lib/geo", "lib/xp_sim_data", "plugins/logbook-xp12"] }
 [package]
 name = "logbook"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+xp_sim_data = { path = "lib/xp_sim_data" }
 # Nav data
 geo = { path = "lib/geo" }
 rusqlite = { version = "0.30", features = ["bundled"] }

@@ -3,6 +3,7 @@ use crate::{
     sim_connection::{SimConnection, SimMessage},
 };
 use geo::LatLon;
+use xp_sim_data::SimData;
 use std::{
     collections::VecDeque,
     ffi,
@@ -66,48 +67,6 @@ impl SimConnection for Xplane {
             Err(ref e) if e.kind() == io::ErrorKind::ConnectionAborted => Ok(SimMessage::Quit),
             Err(e) => Err(Box::new(e)),
         }
-    }
-}
-
-#[derive(Debug)]
-struct SimData {
-    icao: String,
-    name: String,
-    registration: String,
-    latitude: f64,
-    longitude: f64,
-    engine_on: bool,
-    on_ground: bool,
-}
-
-impl SimData {
-    fn from_csv(csv: &str) -> Result<Self, Box<dyn std::error::Error>> {
-        let record = csv.split(",").collect::<Vec<&str>>();
-        if record.len() < 7 {
-            return Err("Invalid CSV record".into());
-        }
-        Ok(Self {
-            icao: record[0].to_owned(),
-            name: record[1].to_owned(),
-            registration: record[2].to_owned(),
-            latitude: record[3].parse()?,
-            longitude: record[4].parse()?,
-            engine_on: record[5].parse()?,
-            on_ground: record[6].parse()?,
-        })
-    }
-
-    fn to_csv(&self) -> Result<String, Box<dyn std::error::Error>> {
-        let record = [
-            self.icao.clone(),
-            self.name.clone(),
-            self.registration.clone(),
-            self.latitude.to_string(),
-            self.longitude.to_string(),
-            self.engine_on.to_string(),
-            self.on_ground.to_string(),
-        ];
-        Ok(record.join(","))
     }
 }
 

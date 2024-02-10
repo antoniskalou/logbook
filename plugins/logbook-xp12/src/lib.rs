@@ -7,6 +7,7 @@ use xplm::data::{ArrayRead, DataRead, ReadOnly, StringRead};
 use xplm::flight_loop::{FlightLoop, FlightLoopCallback, LoopState};
 use xplm::plugin::{Plugin, PluginInfo};
 use xplm::xplane_plugin;
+use xp_sim_data::SimData;
 
 /// extension of xplm::debugln! that prints the plugin name before the
 /// log message.
@@ -59,21 +60,26 @@ impl FlightLoopHandler {
         })
     }
 
-    fn as_record(&self) -> Vec<String> {
+    fn sim_data(&self) -> SimData {
         let icao = self.icao.get_as_string().unwrap_or(String::from("UNKNOWN"));
         let name = self.name.get_as_string().unwrap_or(String::from("UNKNOWN"));
-        let reg = self
+        let registration = self
             .registration
             .get_as_string()
             .unwrap_or(String::from("UNKNOWN"));
-        let lat = self.latitude.get().to_string();
-        let lon = self.longitude.get().to_string();
-        let engine_on = self.engine_on.as_vec().iter().any(|x| *x == 1).to_string();
-        let on_ground = self.on_ground.get().to_string();
-        // TODO: consider using a better format where field order doesn't matter
-        // OR create a new type that's shared between this and the main software
-        // that has the same serialization/deserialization methods as this.
-        vec![icao, name, reg, lat, lon, engine_on, on_ground]
+        let latitude = self.latitude.get();
+        let longitude = self.longitude.get();
+        let engine_on = self.engine_on.as_vec().iter().any(|x| *x == 1);
+        let on_ground = self.on_ground.get();
+        SimData {
+            icao,
+            name,
+            registration,
+            latitude,
+            longitude,
+            engine_on,
+            on_ground
+        }
     }
 }
 
@@ -103,7 +109,7 @@ impl FlightLoopCallback for FlightLoopHandler {
             Err(e) => debugln!("could not open listener: {e}"),
         }
 
-        let record_line = format!("{}\r\n", self.as_record().join(","));
+        let record_line = format!("{}\r\n", self.sim_data().to_csv());
         self.tcp_connections.retain_mut(|(stream, addr)| {
             match stream.write_all(record_line.as_bytes()) {
                 Ok(_) => true,
