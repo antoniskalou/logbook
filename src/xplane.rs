@@ -1,17 +1,20 @@
-use std::{ffi, io::{self, Read}, net::TcpStream, time::Duration};
+use std::{collections::VecDeque, ffi, io::{self, Read}, net::TcpStream, time::Duration};
 use geo::LatLon;
 use crate::{aircraft::Aircraft, sim_connection::{SimConnection, SimMessage}};
 
 pub const SERVER_ADDR: &str = "127.0.0.1:52000";
 
-pub struct Xplane(TcpStream);
+pub struct Xplane {
+    conn: TcpStream,
+    queue: VecDeque<SimData>,
+}
 
 impl Xplane {
     pub fn connect() -> Result<Self, io::Error> {
         // todo: attempt reconnect if closed
         let conn = TcpStream::connect(SERVER_ADDR)?;
         conn.set_read_timeout(Some(Duration::from_secs(1)))?;
-        Ok(Xplane(conn))
+        Ok(Xplane { conn, queue: VecDeque::new() })
     }
 
     fn fetch_messages(
@@ -36,15 +39,22 @@ impl SimConnection for Xplane {
     type Error = Box<dyn std::error::Error>;
 
     fn next_message(&mut self) -> Result<SimMessage, Self::Error> {
+        // drain any queued messages first
+        if let Some(msg) = self.queue.pop_front() {
+            let aircraft = Aircraft::from(msg);
+            return Ok(SimMessage::SimData(aircraft));
+        }
+
         let mut buf = [0; 256];
-        match self.0.read(&mut buf) {
+        match self.conn.read(&mut buf) {
             Ok(_) => {
-                let messages = self.fetch_messages(&buf)?;
-                println!("received {messages:?}");
-                // todo: send all messages to caller
-                let msg = messages.last().unwrap();
-                let sim_data = SimData::from_csv(msg).unwrap();
-                Ok(SimMessage::SimData(Aircraft::from(sim_data)))
+                for msg in self.fetch_messages(&buf)? {
+                    if let Ok(sim_data) = SimData::from_csv(&msg) {
+                        self.queue.push_back(sim_data);
+                    }
+                }
+                // refetch from queue
+                self.next_message()
             }
             Err(ref e) if e.kind() == io::ErrorKind::TimedOut => {
                 Ok(SimMessage::Waiting)
@@ -71,7 +81,9 @@ struct SimData {
 impl SimData {
     fn from_csv(csv: &str) -> Result<Self, Box<dyn std::error::Error>> {
         let record = csv.split(",").collect::<Vec<&str>>();
-        debug_assert!(record.len() >= 7);
+        if record.len() < 7 {
+            return Err("Invalid CSV record".into());
+        }
         Ok(Self {
             icao: record[0].to_owned(),
             name: record[1].to_owned(),
