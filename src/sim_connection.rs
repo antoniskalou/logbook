@@ -5,6 +5,7 @@ pub enum SimMessage {
     Open,
     Quit,
     SimData(Aircraft),
+    Waiting,
     Unknown,
 }
 

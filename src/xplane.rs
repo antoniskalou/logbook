@@ -1,4 +1,4 @@
-use std::{io::Read, net::TcpStream, time::Duration};
+use std::{ffi, io::{self, Read}, net::TcpStream, time::Duration};
 use geo::LatLon;
 use crate::{aircraft::Aircraft, sim_connection::{SimConnection, SimMessage}};
 
@@ -7,29 +7,53 @@ pub const SERVER_ADDR: &str = "127.0.0.1:52000";
 pub struct Xplane(TcpStream);
 
 impl Xplane {
-    pub fn connect() -> Result<Self, std::io::Error> {
+    pub fn connect() -> Result<Self, io::Error> {
         // todo: attempt reconnect if closed
         let conn = TcpStream::connect(SERVER_ADDR)?;
-        // conn.set_read_timeout(Some(Duration::from_millis(1000)))?;
+        conn.set_read_timeout(Some(Duration::from_secs(1)))?;
         Ok(Xplane(conn))
+    }
+
+    fn fetch_messages(
+        &self,
+        buf: &[u8]
+    ) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+        let str = match ffi::CStr::from_bytes_until_nul(buf) {
+            // buffer contains nulls, we can treat it as a CString
+            Ok(c_str) => String::from(c_str.to_str()?),
+            // buffer has no nulls, read the entire thing
+            Err(_) => String::from_utf8_lossy(buf).to_string(),
+        };
+        let messages = str
+            .lines()
+            .map(String::from)
+            .collect::<Vec<String>>();
+        Ok(messages)
     }
 }
 
 impl SimConnection for Xplane {
-    type Error = std::io::Error;
+    type Error = Box<dyn std::error::Error>;
 
     fn next_message(&mut self) -> Result<SimMessage, Self::Error> {
         let mut buf = [0; 256];
-        let _ = self.0.read(&mut buf)?;
-        println!("Read buf: {buf:?}");
-        let c_str = std::ffi::CStr::from_bytes_until_nul(&buf).unwrap();
-        let str = String::from(c_str.to_str().unwrap());
-        let messages = str.split_terminator("\r\n");
-        // todo: properly parse all messages
-        let msg = messages.last().unwrap();
-        println!("Received message: {msg:?}");
-        let sim_data = SimData::from_csv(msg).unwrap();
-        Ok(SimMessage::SimData(Aircraft::from(sim_data)))
+        match self.0.read(&mut buf) {
+            Ok(_) => {
+                let messages = self.fetch_messages(&buf)?;
+                println!("received {messages:?}");
+                // todo: send all messages to caller
+                let msg = messages.last().unwrap();
+                let sim_data = SimData::from_csv(msg).unwrap();
+                Ok(SimMessage::SimData(Aircraft::from(sim_data)))
+            }
+            Err(ref e) if e.kind() == io::ErrorKind::TimedOut => {
+                Ok(SimMessage::Waiting)
+            }
+            Err(ref e) if e.kind() == io::ErrorKind::ConnectionAborted => {
+                Ok(SimMessage::Quit)
+            }
+            Err(e) => Err(Box::new(e))
+        }
     }
 }
 
@@ -47,6 +71,7 @@ struct SimData {
 impl SimData {
     fn from_csv(csv: &str) -> Result<Self, Box<dyn std::error::Error>> {
         let record = csv.split(",").collect::<Vec<&str>>();
+        debug_assert!(record.len() >= 7);
         Ok(Self {
             icao: record[0].to_owned(),
             name: record[1].to_owned(),

@@ -1,4 +1,4 @@
-use std::{ffi, str, ptr};
+use std::{ffi, str, ptr, thread, time};
 use geo::LatLon;
 use simconnect::DispatchResult;
 use crate::aircraft::Aircraft;
@@ -199,7 +199,7 @@ impl Msfs {
 impl SimConnection for Msfs {
     type Error = String;
 
-    fn next_message(&mut self) -> Result<crate::sim_connection::SimMessage, Self::Error> {
+    fn next_message(&mut self) -> Result<SimMessage, Self::Error> {
         let msg = match self.0.get_next_message()? {
             DispatchResult::Open(_) => SimMessage::Open,
             DispatchResult::Quit(_) => SimMessage::Quit,
@@ -217,7 +217,9 @@ impl SimConnection for Msfs {
             },
             msg => {
                 println!("Unhandled message: {msg:?}");
-                SimMessage::Unknown
+                // wait and try again
+                thread::sleep(time::Duration::from_secs(1));
+                self.next_message()?
             },
         };
         Ok(msg)
