@@ -41,7 +41,7 @@ After the navdata has been generated we can copy it over and run the logbook.
 
 ```
 > cp C:\NavDataReader\navdata.sql .\navdata\msfs.sqlite
-> logbook.exe -f MSFS
+> logbook.exe MSFS
 ```
 
 ## X-Plane 12
@@ -66,14 +66,14 @@ After the navdata has been generated we can copy it over and run the logbook.
 First we need to generate the navdata for X-Plane.
 
 ```
-> navdatareader.exe -f XP11
+> navdatareader.exe -f XP12
 ```
 
 We can then copy it over and run the logbook.
 
 ```
 > cp C:\NavDataReader\navdata.sql .\navdata\xp.sqlite
-> logbook.exe -f XP11
+> logbook.exe XP12
 ```
 
 ## License
