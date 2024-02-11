@@ -145,8 +145,25 @@ impl Logbook {
     }
 }
 
+fn pick_sim() -> String {
+    let allowed_choices = vec!["MSFS".to_owned(), "XP12".to_owned()];
+    let choice = std::env::args()
+        .nth(1)
+        .expect("USAGE: logbook.exe <SIM NAME>");
+    if !allowed_choices.contains(&choice) {
+        panic!("Invalid sim provided: {choice}, valid options: {allowed_choices:?}");
+    }
+    choice
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
-    let navdata = rusqlite::Connection::open("navdata/xp12.sqlite")?;
+    let sim_choice = pick_sim();
+    let navdata_path = match sim_choice.as_str() {
+        "MSFS" => "navdata/msfs.sqlite",
+        "XP12" => "navdata/xp12.sqlite",
+        _ => unreachable!(),
+    };
+    let navdata = rusqlite::Connection::open(navdata_path)?;
     navdata.execute(
         "
         create virtual table if not exists airport_coords using rtree(
@@ -163,7 +180,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         (),
     )?;
 
-    let mut sim = xplane::Xplane::connect()?;
+    let mut sim: Box<dyn SimConnection<Error = Box<dyn std::error::Error>>> =
+        match sim_choice.as_str() {
+            "MSFS" => Box::new(msfs::Msfs::connect()),
+            "XP12" => Box::new(xplane::Xplane::connect()?),
+            _ => unreachable!(),
+        };
     let mut logbook = Logbook::new(Path::new("logbook.csv"))?;
     let mut current_flight: Option<Flight> = None;
     loop {

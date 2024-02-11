@@ -198,13 +198,13 @@ impl Msfs {
 }
 
 impl SimConnection for Msfs {
-    type Error = String;
+    type Error = Box<dyn std::error::Error>;
 
     fn next_message(&mut self) -> Result<SimMessage, Self::Error> {
-        let msg = match self.0.get_next_message()? {
-            DispatchResult::Open(_) => SimMessage::Open,
-            DispatchResult::Quit(_) => SimMessage::Quit,
-            DispatchResult::SimObjectData(data) => unsafe {
+        let msg = match self.0.get_next_message() {
+            Ok(DispatchResult::Open(_)) => SimMessage::Open,
+            Ok(DispatchResult::Quit(_)) => SimMessage::Quit,
+            Ok(DispatchResult::SimObjectData(data)) => unsafe {
                 if data.dwDefineID == 0 {
                     let sim_data_ptr = ptr::addr_of!(data.dwData) as *const RawSimData;
                     let sim_data_value = ptr::read_unaligned(sim_data_ptr);
@@ -216,13 +216,17 @@ impl SimConnection for Msfs {
                     SimMessage::Unknown
                 }
             },
-            msg => {
+            Ok(msg) => {
                 println!("Unhandled message: {msg:?}");
-                // wait and try again
-                thread::sleep(time::Duration::from_secs(1));
-                self.next_message()?
+                SimMessage::Unknown
+            }
+            Err(e) => {
+                println!("SimConnect error: {e}");
+                SimMessage::Waiting
             }
         };
+        // MSFS sends a message each second, wait for the next one
+        thread::sleep(time::Duration::from_secs(1));
         Ok(msg)
     }
 }

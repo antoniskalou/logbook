@@ -26,7 +26,7 @@ A CLI based logger for flight simulators.
 ```
 > cp C:\Path\To\SDK\SimConnect.dll .
 > cargo build --release
-> cargo install
+> cargo install --path .
 ```
 
 ### Running
