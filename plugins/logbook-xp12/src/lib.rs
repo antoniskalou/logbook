@@ -120,7 +120,15 @@ impl FlightLoopCallback for FlightLoopHandler {
             Err(e) => debugln!("could not open listener: {e}"),
         }
 
-        let record_line = self.sim_data().to_csv();
+        let record_line = match self.sim_data().to_csv() {
+            Ok(record) => record,
+            Err(e) => {
+                // should basically never happen, handle it to avoid panic
+                debugln!("unexpected CSV serialization error: {e}");
+                return;
+            }
+        };
+
         self.tcp_connections.retain_mut(|(stream, addr)| {
             match send_packet(stream, &record_line) {
                 Ok(_) => true,

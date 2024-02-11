@@ -17,5 +17,4 @@ chrono = "0.4"
 simconnect = "0.3"
 
 # CSV
-# serde = { version = "1.0.196", features = ["derive"] }
 csv = "1.3"

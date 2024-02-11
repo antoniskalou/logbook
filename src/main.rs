@@ -3,7 +3,7 @@ use crate::sim_connection::{SimConnection, SimMessage};
 use chrono::{DateTime, Utc};
 use geo::LatLon;
 use rusqlite::OptionalExtension;
-use std::{error::Error, fs::File, path::Path, thread, time};
+use std::{error::Error, fs::File, path::Path};
 
 mod aircraft;
 mod msfs;
@@ -224,7 +224,5 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
             msg => eprintln!("Unhandled message received: {:?}", msg),
         }
-
-        // std::thread::sleep(std::time::Duration::from_secs(4));
     }
 }
