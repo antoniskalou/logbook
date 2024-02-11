@@ -224,5 +224,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
             msg => eprintln!("Unhandled message received: {:?}", msg),
         }
+
+        // std::thread::sleep(std::time::Duration::from_secs(4));
     }
 }

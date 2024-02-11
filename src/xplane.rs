@@ -31,13 +31,10 @@ impl Xplane {
     }
 
     fn fetch_messages(&self, buf: &[u8]) -> Result<Vec<String>, Box<dyn std::error::Error>> {
-        let str = match ffi::CStr::from_bytes_until_nul(buf) {
-            // buffer contains nulls, we can treat it as a CString
-            Ok(c_str) => String::from(c_str.to_str()?),
-            // buffer has no nulls, read the entire thing
-            Err(_) => String::from_utf8_lossy(buf).to_string(),
-        };
-        let messages = str.lines().map(String::from).collect::<Vec<String>>();
+        let messages = std::str::from_utf8(buf)?
+            .lines()
+            .map(String::from)
+            .collect::<Vec<String>>();
         Ok(messages)
     }
 }
