@@ -83,6 +83,17 @@ impl FlightLoopHandler {
     }
 }
 
+fn send_packet(
+    stream: &mut TcpStream,
+    msg: &str
+) -> Result<(), std::io::Error> {
+    let packet_size = msg.len() as u16;
+    stream.write_all(&packet_size.to_le_bytes())?;
+    stream.write_all(msg.as_bytes())?;
+    stream.flush()?;
+    Ok(())
+}
+
 // NOTE: be careful! we can't panic here, it will crash the sim.
 //
 // in other places of the code we can panic just fine, xplm will handle it.
@@ -109,9 +120,9 @@ impl FlightLoopCallback for FlightLoopHandler {
             Err(e) => debugln!("could not open listener: {e}"),
         }
 
-        let record_line = format!("{}\r\n", self.sim_data().to_csv());
+        let record_line = self.sim_data().to_csv();
         self.tcp_connections.retain_mut(|(stream, addr)| {
-            match stream.write_all(record_line.as_bytes()) {
+            match send_packet(stream, &record_line) {
                 Ok(_) => true,
                 // client closed connection
                 Err(ref e) if e.kind() == std::io::ErrorKind::ConnectionAborted => {
