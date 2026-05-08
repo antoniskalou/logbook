@@ -92,6 +92,23 @@ impl DMS {
             })
             .unwrap_or(d)
     }
+
+    pub fn as_compact(&self) -> String {
+        let degree_width = match self.cardinal {
+            Some(Cardinal::East) | Some(Cardinal::West) => 3,
+            Some(Cardinal::North) | Some(Cardinal::South) => 2,
+            _ => panic!("missing cardinal, can't encode DMS as compact"),
+        };
+
+        format!(
+            "{:0degree_width$}{:02}{:02}{}",
+            self.degrees,
+            self.minutes,
+            self.seconds.round() as u32,
+            self.cardinal.unwrap(),
+            degree_width = degree_width
+        )
+    }
 }
 
 impl std::fmt::Display for DMS {
@@ -194,6 +211,41 @@ mod test {
         lat: 34.875,
         lon: 33.624722,
     };
+
+    #[test]
+    fn test_dms_as_compact() {
+        // latitude
+        assert_eq!(
+            "531828N",
+            DMS::new(53, 18, 28.0, Cardinal::North).as_compact()
+        );
+        // longitude
+        assert_eq!(
+            "0043701W",
+            DMS::new(4, 37, 1.0, Cardinal::West).as_compact()
+        );
+        // padding latitude
+        assert_eq!("070309S", DMS::new(7, 3, 9.0, Cardinal::South).as_compact());
+        // padding longitude
+        assert_eq!("0080502E", DMS::new(8, 5, 2.0, Cardinal::East).as_compact());
+        // rounds seconds
+        assert_eq!(
+            "531828N",
+            DMS::new(53, 18, 27.6, Cardinal::North).as_compact()
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "missing cardinal")]
+    fn test_dms_as_compact_without_cardinal() {
+        let dms = DMS {
+            degrees: 53,
+            minutes: 18,
+            seconds: 28.0,
+            cardinal: None,
+        };
+        dms.as_compact();
+    }
 
     #[test]
     fn test_latlon_destination() {
