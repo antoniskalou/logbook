@@ -3,6 +3,7 @@ use crate::sim_connection::{SimConnection, SimMessage};
 use chrono::{DateTime, Utc};
 use geo::LatLon;
 use rusqlite::OptionalExtension;
+use std::str::FromStr;
 use std::{error::Error, fs::File, path::Path};
 
 mod aircraft;
@@ -169,23 +170,40 @@ impl Logbook {
     }
 }
 
-fn pick_sim() -> String {
-    let allowed_choices = vec!["MSFS".to_owned(), "XP12".to_owned()];
-    let choice = std::env::args()
-        .nth(1)
-        .expect("USAGE: logbook.exe <SIM NAME>");
-    if !allowed_choices.contains(&choice) {
-        panic!("Invalid sim provided: {choice}, valid options: {allowed_choices:?}");
+#[derive(Clone, Copy, Debug)]
+enum Simulator {
+    Msfs,
+    Xp12,
+}
+
+impl FromStr for Simulator {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_ascii_uppercase().as_str() {
+            "MSFS" | "MSFS2020" | "MSFS2024" => Ok(Simulator::Msfs),
+            "XP12" | "XPLANE" | "X-PLANE" => Ok(Simulator::Xp12),
+            _ => Err(format!(
+                "Invalid simulator '{}'. Valid options are: MSFS, XP12",
+                s
+            )),
+        }
     }
-    choice
+}
+
+fn pick_sim() -> Simulator {
+    std::env::args()
+        .nth(1)
+        .expect("USAGE: logbook.exe <SIM NAME>")
+        .parse()
+        .unwrap()
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
     let sim_choice = pick_sim();
-    let navdata_path = match sim_choice.as_str() {
-        "MSFS" => "navdata/msfs.sqlite",
-        "XP12" => "navdata/xp12.sqlite",
-        _ => unreachable!(),
+    let navdata_path = match sim_choice {
+        Simulator::Msfs => "navdata/msfs.sqlite",
+        Simulator::Xp12 => "navdata/xp12.sqlite",
     };
     let navdata = rusqlite::Connection::open(navdata_path)?;
     navdata.execute(
@@ -204,12 +222,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         (),
     )?;
 
-    let mut sim: Box<dyn SimConnection<Error = Box<dyn std::error::Error>>> =
-        match sim_choice.as_str() {
-            "MSFS" => Box::new(msfs::Msfs::connect()),
-            "XP12" => Box::new(xplane::Xplane::connect()?),
-            _ => unreachable!(),
-        };
+    let mut sim: Box<dyn SimConnection<Error = Box<dyn std::error::Error>>> = match sim_choice {
+        Simulator::Msfs => Box::new(msfs::Msfs::connect()),
+        Simulator::Xp12 => Box::new(xplane::Xplane::connect()?),
+    };
     let mut logbook = Logbook::new(Path::new("logbook.csv"))?;
     let mut current_flight: Option<Flight> = None;
     loop {
