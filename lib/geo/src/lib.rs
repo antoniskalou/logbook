@@ -192,6 +192,11 @@ impl LatLon {
     pub fn distance(&self, other: &LatLon) -> f64 {
         Geodesic::wgs84().inverse(self.lat, self.lon, other.lat, other.lon)
     }
+
+    pub fn as_compact(&self) -> String {
+        let (lat, lon) = self.to_dms();
+        format!("{}{}", lat.as_compact(), lon.as_compact())
+    }
 }
 
 #[cfg(test)]
@@ -282,5 +287,20 @@ mod test {
         let dest = LCPH.destination(270.0, 10.0);
         assert_eq!(-10.0, LCPH.distance_xy(&dest).0.round());
         assert_eq!(0.0, LCPH.distance_xy(&dest).1.round());
+    }
+
+    #[test]
+    fn test_latlon_as_compact_full_coordinate() {
+        let pos = LatLon::new(53.307778, -4.616944);
+
+        assert_eq!("531828N0043701W", pos.as_compact());
+    }
+
+    #[test]
+    fn test_latlon_as_compact_southern_eastern_hemisphere() {
+        let pos = LatLon::new(-33.9249, 18.4241);
+        let compact = pos.as_compact();
+        assert!(compact.ends_with('E'));
+        assert!(compact.contains('S'));
     }
 }
