@@ -19,6 +19,22 @@ struct Airport {
     position: LatLon,
 }
 
+#[derive(Clone, Debug)]
+enum AirportOrCoord {
+    Airport(Airport),
+    Position(LatLon),
+}
+
+impl std::fmt::Display for AirportOrCoord {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            AirportOrCoord::Airport(airport) => airport.ident.clone(),
+            AirportOrCoord::Position(latlon) => latlon.as_compact(),
+        };
+        write!(f, "{}", s)
+    }
+}
+
 fn search_within(
     navdata: &rusqlite::Connection,
     origin: LatLon,
@@ -67,8 +83,8 @@ struct Flight {
     aircraft: Aircraft,
     state: FlightState,
     taxi_out: Option<DateTime<Utc>>,
-    departure: Option<(Airport, DateTime<Utc>)>,
-    arrival: Option<(Airport, DateTime<Utc>)>,
+    departure: Option<(AirportOrCoord, DateTime<Utc>)>,
+    arrival: Option<(AirportOrCoord, DateTime<Utc>)>,
     shutdown: Option<DateTime<Utc>>,
 }
 
@@ -84,12 +100,14 @@ impl Flight {
         }
     }
 
-    fn arrive(&mut self, airport: &Airport, time: &DateTime<Utc>) {
-        self.arrival = Some((airport.clone(), *time));
+    fn arrive(&mut self, airport: Option<&Airport>, time: &DateTime<Utc>) {
+        let arrival = self.airport_or_coord(airport);
+        self.arrival = Some((arrival, *time));
     }
 
-    fn depart(&mut self, airport: &Airport, time: &DateTime<Utc>) {
-        self.departure = Some((airport.clone(), *time));
+    fn depart(&mut self, airport: Option<&Airport>, time: &DateTime<Utc>) {
+        let departure = self.airport_or_coord(airport);
+        self.departure = Some((departure, *time));
     }
 
     fn to_record(&self) -> Vec<Option<String>> {
@@ -98,12 +116,18 @@ impl Flight {
             Some(self.aircraft.icao.clone()),
             Some(self.aircraft.registration.clone()),
             self.taxi_out.map(|dt| date_to_string(&dt)),
-            self.departure.clone().map(|d| d.0.ident),
-            self.departure.clone().map(|d| date_to_string(&d.1)),
-            self.arrival.clone().map(|a| a.0.ident),
-            self.arrival.clone().map(|a| date_to_string(&a.1)),
+            self.departure.as_ref().map(|d| d.0.to_string()),
+            self.departure.as_ref().map(|d| date_to_string(&d.1)),
+            self.arrival.as_ref().map(|a| a.0.to_string()),
+            self.arrival.as_ref().map(|a| date_to_string(&a.1)),
             self.shutdown.map(|dt| date_to_string(&dt)),
         ]
+    }
+
+    fn airport_or_coord(&self, airport: Option<&Airport>) -> AirportOrCoord {
+        airport
+            .map(|a| AirportOrCoord::Airport(a.clone()))
+            .unwrap_or_else(|| AirportOrCoord::Position(self.aircraft.position))
     }
 }
 
@@ -208,15 +232,13 @@ fn main() -> Result<(), Box<dyn Error>> {
                     }
                     FlightState::Taxi => {
                         if !aircraft.on_ground {
-                            let airport = closest_airport.expect("invalid takeoff airport");
-                            flight.depart(&airport, &Utc::now());
+                            flight.depart(closest_airport.as_ref(), &Utc::now());
                             flight.state = FlightState::EnRoute;
                         }
                     }
                     FlightState::EnRoute => {
                         if aircraft.on_ground {
-                            let airport = closest_airport.expect("invalid landing airport");
-                            flight.arrive(&airport, &Utc::now());
+                            flight.arrive(closest_airport.as_ref(), &Utc::now());
                             flight.state = FlightState::Landed;
                         }
                     }
