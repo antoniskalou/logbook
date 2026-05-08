@@ -1,4 +1,11 @@
-workspace = { members = ["lib/geo", "lib/xp_sim_data", "plugins/logbook-xp12"] }
+[workspace]
+members = [
+  ".",
+  "lib/geo",
+  "lib/xp_sim_data",
+  "plugins/logbook-xp12"
+]
+
 [package]
 name = "logbook"
 version = "0.2.0"
