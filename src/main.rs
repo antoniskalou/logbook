@@ -241,7 +241,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut logbook = Logbook::new(Path::new("logbook.csv"))?;
     let mut current_flight: Option<Flight> = None;
 
-    let progress_spinner = make_progress_spinner();
+    let mut progress_spinner = make_progress_spinner();
     loop {
         match sim.next_message() {
             Ok(SimMessage::SimData(aircraft)) => {
@@ -315,17 +315,17 @@ fn main() -> Result<(), Box<dyn Error>> {
                     }
                 }
             }
-            Ok(SimMessage::Waiting) => {
-                // do nothing
-            }
-            Ok(SimMessage::Open) => {
-                if !progress_spinner.is_finished() {
-                    progress_spinner.finish_with_message("🔗 Simulator connected");
+            Ok(SimMessage::Connecting) => {
+                if progress_spinner.is_finished() {
+                    progress_spinner = make_progress_spinner();
                 }
             }
-            Ok(SimMessage::Quit) => {
+            Ok(SimMessage::Connected) => {
+                progress_spinner.finish_with_message("🔗 Simulator connected");
+            }
+            Ok(SimMessage::Disconnected) => {
                 println!("⚠  Lost simulator connection");
-                progress_spinner.reset();
+                progress_spinner = make_progress_spinner();
             }
             msg => debug!("Unhandled message received: {:?}", msg),
         }

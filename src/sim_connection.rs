@@ -2,10 +2,10 @@ use crate::aircraft::Aircraft;
 
 #[derive(Debug)]
 pub enum SimMessage {
-    Open,
-    Quit,
+    Connecting,
+    Connected,
+    Disconnected,
     SimData(Aircraft),
-    Waiting,
     Unknown,
 }
 

@@ -1,7 +1,7 @@
 use crate::aircraft::Aircraft;
 use crate::sim_connection::{SimConnection, SimMessage};
 use geo::LatLon;
-use log::debug;
+use log::{debug, trace};
 use simconnect::DispatchResult;
 use std::{ffi, ptr, str, thread, time};
 
@@ -245,7 +245,7 @@ impl SimConnection for Msfs {
 
             thread::sleep(time::Duration::from_secs(1));
 
-            return Ok(SimMessage::Waiting);
+            return Ok(SimMessage::Connecting);
         }
 
         let conn = self.conn.as_mut().unwrap();
@@ -256,12 +256,12 @@ impl SimConnection for Msfs {
                 Self::subscribe_to_data(conn);
                 self.state = ConnectionState::Connected;
 
-                SimMessage::Open
+                SimMessage::Connected
             }
             Ok(DispatchResult::Quit(_)) => {
                 debug!("Simulator closed");
                 self.disconnect();
-                SimMessage::Quit
+                SimMessage::Disconnected
             }
             Ok(DispatchResult::SimObjectData(data)) => unsafe {
                 if self.state != ConnectionState::Ready {
@@ -289,13 +289,16 @@ impl SimConnection for Msfs {
                     debug!("Connection lost: {e}");
                     // reset connection, force retry
                     self.disconnect();
+
+                    SimMessage::Disconnected
                 } else {
                     debug!("Waiting for aircraft data...");
-                }
 
-                SimMessage::Waiting
+                    SimMessage::Connecting
+                }
             }
         };
+        trace!("next_message: {msg:?}");
         // MSFS sends a message each second, wait for the next one
         thread::sleep(time::Duration::from_secs(1));
         Ok(msg)

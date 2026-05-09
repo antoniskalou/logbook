@@ -3,12 +3,12 @@ use crate::{
     sim_connection::{SimConnection, SimMessage},
 };
 use geo::LatLon;
-use xp_sim_data::SimData;
 use std::{
     io::{self, Read},
     net::TcpStream,
     time::Duration,
 };
+use xp_sim_data::SimData;
 
 pub const SERVER_ADDR: &str = "127.0.0.1:52000";
 
@@ -21,7 +21,7 @@ impl Xplane {
         // todo: attempt reconnect if closed
         let conn = TcpStream::connect(SERVER_ADDR)?;
         conn.set_read_timeout(Some(Duration::from_secs(1)))?;
-        Ok(Xplane { conn, })
+        Ok(Xplane { conn })
     }
 }
 
@@ -35,8 +35,10 @@ impl SimConnection for Xplane {
                 let sim_data = SimData::from_csv(msg)?;
                 Ok(SimMessage::SimData(Aircraft::from(sim_data)))
             }
-            Err(ref e) if e.kind() == io::ErrorKind::TimedOut => Ok(SimMessage::Waiting),
-            Err(ref e) if e.kind() == io::ErrorKind::ConnectionAborted => Ok(SimMessage::Quit),
+            Err(ref e) if e.kind() == io::ErrorKind::TimedOut => Ok(SimMessage::Connecting),
+            Err(ref e) if e.kind() == io::ErrorKind::ConnectionAborted => {
+                Ok(SimMessage::Disconnected)
+            }
             Err(e) => Err(Box::new(e)),
         }
     }
