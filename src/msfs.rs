@@ -103,27 +103,47 @@ impl TryFrom<RawSimData> for Aircraft {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ConnectionState {
+    /// no connection yet established
+    Disconnected,
+    /// connected to sim, but not yet ready to send data
+    Connected,
+    /// connected to sim and ready to send data
+    Ready,
+}
+
 pub struct Msfs {
     conn: Option<simconnect::SimConnector>,
+    state: ConnectionState,
 }
 
 impl Msfs {
-    fn try_connect() -> Option<simconnect::SimConnector> {
+    pub fn connect() -> Self {
+        Self {
+            conn: None,
+            state: ConnectionState::Disconnected,
+        }
+    }
+
+    fn try_connect(&mut self) {
+        if self.conn.is_some() {
+            return;
+        }
+
         let mut conn = simconnect::SimConnector::new();
 
         if conn.connect("Logbook") {
             println!("[SIMCONNECT] Connected to sim");
 
-            Some(conn)
-        } else {
-            None
+            self.conn = Some(conn);
+            self.state = ConnectionState::Connected;
         }
     }
 
-    pub fn connect() -> Self {
-        Self {
-            conn: Self::try_connect(),
-        }
+    fn disconnect(&mut self) {
+        self.conn = None;
+        self.state = ConnectionState::Disconnected;
     }
 
     fn subscribe_to_data(conn: &mut simconnect::SimConnector) {
@@ -220,7 +240,7 @@ impl SimConnection for Msfs {
 
     fn next_message(&mut self) -> Result<SimMessage, Self::Error> {
         if self.conn.is_none() {
-            self.conn = Self::try_connect();
+            self.try_connect();
 
             thread::sleep(time::Duration::from_secs(1));
 
@@ -233,15 +253,21 @@ impl SimConnection for Msfs {
                 println!("[SIMCONNECT] Simulator opened");
 
                 Self::subscribe_to_data(conn);
+                self.state = ConnectionState::Connected;
 
                 SimMessage::Open
             }
             Ok(DispatchResult::Quit(_)) => {
                 println!("[SIMCONNECT] Simulator closed");
-                self.conn = None;
+                self.disconnect();
                 SimMessage::Quit
             }
             Ok(DispatchResult::SimObjectData(data)) => unsafe {
+                if self.state != ConnectionState::Ready {
+                    println!("[SIMCONNECT] Aircraft data stream active, connection ready");
+                    self.state = ConnectionState::Ready;
+                }
+
                 if data.dwDefineID == 0 {
                     let sim_data_ptr = ptr::addr_of!(data.dwData) as *const RawSimData;
                     let sim_data_value = ptr::read_unaligned(sim_data_ptr);
@@ -258,10 +284,13 @@ impl SimConnection for Msfs {
                 SimMessage::Unknown
             }
             Err(e) => {
-                println!("[SIMCONNECT] Connection lost: {e}");
-
-                // reset connection, force retry
-                self.conn = None;
+                if self.state == ConnectionState::Ready {
+                    println!("[SIMCONNECT] Connection lost: {e}");
+                    // reset connection, force retry
+                    self.disconnect();
+                } else {
+                    println!("[SIMCONNECT] Waiting for aircraft data...");
+                }
 
                 SimMessage::Waiting
             }
