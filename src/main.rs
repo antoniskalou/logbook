@@ -2,6 +2,7 @@ use crate::aircraft::Aircraft;
 use crate::sim_connection::{SimConnection, SimMessage};
 use chrono::{DateTime, Utc};
 use geo::LatLon;
+use log::debug;
 use rusqlite::OptionalExtension;
 use std::str::FromStr;
 use std::{error::Error, fs::File, path::Path};
@@ -200,6 +201,8 @@ fn pick_sim() -> Simulator {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
+    env_logger::init();
+
     let sim_choice = pick_sim();
     let navdata_path = match sim_choice {
         Simulator::Msfs => "navdata/msfs.sqlite",
@@ -238,7 +241,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
                 let closest_airport = search_within(&navdata, aircraft.position)?;
                 let flight = current_flight.as_mut().unwrap();
-                println!("{:?}", flight);
+                debug!("{:#?}", flight);
                 match flight.state {
                     FlightState::Preflight => {
                         if aircraft.engine_on {

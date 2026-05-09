@@ -1,6 +1,7 @@
 use crate::aircraft::Aircraft;
 use crate::sim_connection::{SimConnection, SimMessage};
 use geo::LatLon;
+use log::debug;
 use simconnect::DispatchResult;
 use std::{ffi, ptr, str, thread, time};
 
@@ -134,7 +135,7 @@ impl Msfs {
         let mut conn = simconnect::SimConnector::new();
 
         if conn.connect("Logbook") {
-            println!("[SIMCONNECT] Connected to sim");
+            debug!("Connected to simulator");
 
             self.conn = Some(conn);
             self.state = ConnectionState::Connected;
@@ -250,7 +251,7 @@ impl SimConnection for Msfs {
         let conn = self.conn.as_mut().unwrap();
         let msg = match conn.get_next_message() {
             Ok(DispatchResult::Open(_)) => {
-                println!("[SIMCONNECT] Simulator opened");
+                debug!("Simulator opened");
 
                 Self::subscribe_to_data(conn);
                 self.state = ConnectionState::Connected;
@@ -258,13 +259,13 @@ impl SimConnection for Msfs {
                 SimMessage::Open
             }
             Ok(DispatchResult::Quit(_)) => {
-                println!("[SIMCONNECT] Simulator closed");
+                debug!("Simulator closed");
                 self.disconnect();
                 SimMessage::Quit
             }
             Ok(DispatchResult::SimObjectData(data)) => unsafe {
                 if self.state != ConnectionState::Ready {
-                    println!("[SIMCONNECT] Aircraft data stream active, connection ready");
+                    debug!("Aircraft data stream active, connection ready");
                     self.state = ConnectionState::Ready;
                 }
 
@@ -280,16 +281,16 @@ impl SimConnection for Msfs {
                 }
             },
             Ok(msg) => {
-                println!("[SIMCONNECT] Unhandled message: {msg:?}");
+                debug!("Unhandled message: {msg:?}");
                 SimMessage::Unknown
             }
             Err(e) => {
                 if self.state == ConnectionState::Ready {
-                    println!("[SIMCONNECT] Connection lost: {e}");
+                    debug!("Connection lost: {e}");
                     // reset connection, force retry
                     self.disconnect();
                 } else {
-                    println!("[SIMCONNECT] Waiting for aircraft data...");
+                    debug!("Waiting for aircraft data...");
                 }
 
                 SimMessage::Waiting

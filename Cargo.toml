@@ -10,6 +10,10 @@ xp_sim_data = { path = "lib/xp_sim_data" }
 geo = { path = "lib/geo" }
 rusqlite = { version = "0.30", features = ["bundled"] }
 
+# Logging
+log = "0.4"
+env_logger = "0.11"
+
 # Time
 chrono = "0.4"
 
