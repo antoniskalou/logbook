@@ -2,6 +2,7 @@ use crate::aircraft::Aircraft;
 use crate::sim_connection::{SimConnection, SimMessage};
 use chrono::{DateTime, Utc};
 use geo::LatLon;
+use indicatif::{ProgressBar, ProgressStyle};
 use log::debug;
 use rusqlite::OptionalExtension;
 use std::str::FromStr;
@@ -203,6 +204,11 @@ fn pick_sim() -> Simulator {
 fn main() -> Result<(), Box<dyn Error>> {
     env_logger::init();
 
+    let progress_spinner = ProgressBar::new_spinner();
+    progress_spinner.set_style(ProgressStyle::with_template("{spinner:.green} {msg}").unwrap());
+    progress_spinner.enable_steady_tick(std::time::Duration::from_millis(120));
+    progress_spinner.set_message("Waiting for simulator connection...");
+
     let sim_choice = pick_sim();
     let navdata_path = match sim_choice {
         Simulator::Msfs => "navdata/msfs.sqlite",
@@ -280,10 +286,12 @@ fn main() -> Result<(), Box<dyn Error>> {
                 }
             }
             Ok(SimMessage::Waiting) => {
-                println!("Waiting for simulator connection...");
+                if progress_spinner.is_finished() {
+                    progress_spinner.reset();
+                }
             }
             Ok(SimMessage::Open) => {
-                println!("Simulator connection established.")
+                progress_spinner.finish_with_message("✔  Simulator connected");
             }
             Ok(SimMessage::Quit) => {
                 println!("Simulator connection closed.");
