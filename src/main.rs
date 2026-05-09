@@ -245,6 +245,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     loop {
         match sim.next_message() {
             Ok(SimMessage::SimData(aircraft)) => {
+                // stop spinner, sim is ready!
+                if !progress_spinner.is_finished() {
+                    progress_spinner.finish_with_message("🔗 Simulator connected");
+                }
+
                 // reset flight if aircraft is changed
                 if let Some(flight) = &current_flight {
                     if !flight.aircraft.is_same_airframe(&aircraft) {
@@ -321,9 +326,6 @@ fn main() -> Result<(), Box<dyn Error>> {
                 if progress_spinner.is_finished() {
                     progress_spinner = make_progress_spinner();
                 }
-            }
-            Ok(SimMessage::Connected) => {
-                progress_spinner.finish_with_message("🔗 Simulator connected");
             }
             Ok(SimMessage::Disconnected) => {
                 println!("⚠  Lost simulator connection");

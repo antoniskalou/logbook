@@ -138,7 +138,6 @@ impl Msfs {
             debug!("Connected to simulator");
 
             self.conn = Some(conn);
-            self.state = ConnectionState::Connected;
         }
     }
 
@@ -256,7 +255,7 @@ impl SimConnection for Msfs {
                 Self::subscribe_to_data(conn);
                 self.state = ConnectionState::Connected;
 
-                SimMessage::Connected
+                SimMessage::Connecting
             }
             Ok(DispatchResult::Quit(_)) => {
                 debug!("Simulator closed");
