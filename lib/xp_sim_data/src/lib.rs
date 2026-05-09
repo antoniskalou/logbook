@@ -1,4 +1,4 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SimData {
@@ -65,6 +65,9 @@ mod tests {
             on_ground: true,
         };
         let csv = sim_data.to_csv().unwrap();
-        assert_eq!(csv, String::from("CL60,Challenger 650,C-FAAV,32.000123,42.000123,false,true\n"));
+        assert_eq!(
+            csv,
+            String::from("CL60,Challenger 650,C-FAAV,32.000123,42.000123,false,true\r\n")
+        );
     }
 }

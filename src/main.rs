@@ -201,13 +201,16 @@ fn pick_sim() -> Simulator {
         .unwrap()
 }
 
+fn make_progress_spinner() -> ProgressBar {
+    let spinner = ProgressBar::new_spinner();
+    spinner.set_style(ProgressStyle::with_template("{spinner:.green} {msg}").unwrap());
+    spinner.enable_steady_tick(std::time::Duration::from_millis(120));
+    spinner.set_message("Waiting for simulator connection...");
+    spinner
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     env_logger::init();
-
-    let progress_spinner = ProgressBar::new_spinner();
-    progress_spinner.set_style(ProgressStyle::with_template("{spinner:.green} {msg}").unwrap());
-    progress_spinner.enable_steady_tick(std::time::Duration::from_millis(120));
-    progress_spinner.set_message("Waiting for simulator connection...");
 
     let sim_choice = pick_sim();
     let navdata_path = match sim_choice {
@@ -237,6 +240,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
     let mut logbook = Logbook::new(Path::new("logbook.csv"))?;
     let mut current_flight: Option<Flight> = None;
+
+    let progress_spinner = make_progress_spinner();
     loop {
         match sim.next_message() {
             Ok(SimMessage::SimData(aircraft)) => {
@@ -256,7 +261,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
                 let closest_airport = search_within(&navdata, aircraft.position)?;
                 let flight = current_flight.as_mut().unwrap();
-                debug!("{:#?}", flight);
+                debug!("{:?}", flight);
                 match flight.state {
                     FlightState::Preflight => {
                         if aircraft.engine_on {
