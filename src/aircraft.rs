@@ -9,3 +9,9 @@ pub struct Aircraft {
     pub engine_on: bool,
     pub on_ground: bool,
 }
+
+impl Aircraft {
+    pub fn is_same_airframe(&self, other: &Aircraft) -> bool {
+        self.registration == other.registration && self.title == other.title
+    }
+}

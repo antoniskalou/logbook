@@ -240,8 +240,17 @@ fn main() -> Result<(), Box<dyn Error>> {
     loop {
         match sim.next_message() {
             Ok(SimMessage::SimData(aircraft)) => {
+                // reset flight if aircraft is changed
+                if let Some(flight) = &current_flight {
+                    if !flight.aircraft.is_same_airframe(&aircraft) {
+                        current_flight = None;
+                    }
+                }
+
                 // initialize current flight if there isn't one
                 if current_flight.is_none() {
+                    println!("\n\n✈  {} — {}", aircraft.registration, aircraft.title);
+
                     current_flight = Some(Flight::new(&aircraft));
                 }
 
@@ -251,33 +260,49 @@ fn main() -> Result<(), Box<dyn Error>> {
                 match flight.state {
                     FlightState::Preflight => {
                         if aircraft.engine_on {
-                            flight.taxi_out = Some(Utc::now());
+                            let time = Utc::now();
+                            flight.taxi_out = Some(time);
                             flight.state = FlightState::Taxi;
+
+                            println!("🟢 Engine(s) started at {}", time.format("%H:%M UTC"));
                         }
                     }
                     FlightState::Taxi => {
                         if !aircraft.on_ground {
                             flight.depart(closest_airport.as_ref(), &Utc::now());
                             flight.state = FlightState::EnRoute;
+
+                            if let Some((airport, time)) = &flight.departure {
+                                println!("🛫 Departed {} at {}", airport, time.format("%H:%M UTC"));
+                            }
                         }
                     }
                     FlightState::EnRoute => {
                         if aircraft.on_ground {
                             flight.arrive(closest_airport.as_ref(), &Utc::now());
                             flight.state = FlightState::Landed;
+
+                            if let Some((airport, time)) = &flight.arrival {
+                                println!("🛬 Arrived {} at {}", airport, time.format("%H:%M UTC"));
+                            }
                         }
                     }
                     FlightState::Landed => {
                         if !aircraft.on_ground {
+                            println!("🔄 Go-around / touch-and-go detected");
                             // did a touch and go or a go around
                             flight.state = FlightState::EnRoute;
                         } else if !aircraft.engine_on {
                             flight.shutdown = Some(Utc::now());
                             flight.state = FlightState::Complete;
+
+                            if let Some(time) = flight.shutdown {
+                                println!("🛑 Engine(s) shutdown at {}", time.format("%H:%M UTC"));
+                            }
                         }
                     }
                     FlightState::Complete => {
-                        println!("Flight completed!");
+                        println!("✅ Flight logged");
                         // store record
                         logbook.log(flight)?;
                         // reset flight
@@ -286,17 +311,18 @@ fn main() -> Result<(), Box<dyn Error>> {
                 }
             }
             Ok(SimMessage::Waiting) => {
-                if progress_spinner.is_finished() {
-                    progress_spinner.reset();
-                }
+                // do nothing
             }
             Ok(SimMessage::Open) => {
-                progress_spinner.finish_with_message("✔  Simulator connected");
+                if !progress_spinner.is_finished() {
+                    progress_spinner.finish_with_message("🔗 Simulator connected");
+                }
             }
             Ok(SimMessage::Quit) => {
-                println!("Simulator connection closed.");
+                println!("⚠  Lost simulator connection");
+                progress_spinner.reset();
             }
-            msg => eprintln!("Unhandled message received: {:?}", msg),
+            msg => debug!("Unhandled message received: {:?}", msg),
         }
     }
 }
