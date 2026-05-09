@@ -112,93 +112,7 @@ impl Msfs {
         let mut conn = simconnect::SimConnector::new();
 
         if conn.connect("Logbook") {
-            println!("MSFS Connected");
-
-            // setup data definitions
-            conn.add_data_definition(
-                0,
-                "TITLE",
-                "",
-                simconnect::SIMCONNECT_DATATYPE_SIMCONNECT_DATATYPE_STRING128,
-                u32::MAX,
-                0.0,
-            );
-            conn.add_data_definition(
-                0,
-                "ENG COMBUSTION:1",
-                "Boolean",
-                simconnect::SIMCONNECT_DATATYPE_SIMCONNECT_DATATYPE_FLOAT64,
-                u32::MAX,
-                0.0,
-            );
-            conn.add_data_definition(
-                0,
-                "ENG COMBUSTION:2",
-                "Boolean",
-                simconnect::SIMCONNECT_DATATYPE_SIMCONNECT_DATATYPE_FLOAT64,
-                u32::MAX,
-                0.0,
-            );
-            conn.add_data_definition(
-                0,
-                "ENG COMBUSTION:3",
-                "Boolean",
-                simconnect::SIMCONNECT_DATATYPE_SIMCONNECT_DATATYPE_FLOAT64,
-                u32::MAX,
-                0.0,
-            );
-            conn.add_data_definition(
-                0,
-                "ENG COMBUSTION:4",
-                "Boolean",
-                simconnect::SIMCONNECT_DATATYPE_SIMCONNECT_DATATYPE_FLOAT64,
-                u32::MAX,
-                0.0,
-            );
-            conn.add_data_definition(
-                0,
-                "PLANE LATITUDE",
-                "Radians",
-                simconnect::SIMCONNECT_DATATYPE_SIMCONNECT_DATATYPE_FLOAT64,
-                u32::MAX,
-                0.0,
-            );
-            conn.add_data_definition(
-                0,
-                "PLANE LONGITUDE",
-                "Radians",
-                simconnect::SIMCONNECT_DATATYPE_SIMCONNECT_DATATYPE_FLOAT64,
-                u32::MAX,
-                0.0,
-            );
-            conn.add_data_definition(
-                0,
-                "SIM ON GROUND",
-                "Boolean",
-                simconnect::SIMCONNECT_DATATYPE_SIMCONNECT_DATATYPE_FLOAT64,
-                u32::MAX,
-                0.0,
-            );
-            conn.add_data_definition(
-                0,
-                "ATC ID",
-                "",
-                simconnect::SIMCONNECT_DATATYPE_SIMCONNECT_DATATYPE_STRING32,
-                u32::MAX,
-                0.0,
-            );
-
-            // receive data related to the user aircraft
-            conn.request_data_on_sim_object(
-                0, // request id
-                0, // define id
-                0, // object id (user)
-                simconnect::SIMCONNECT_PERIOD_SIMCONNECT_PERIOD_SECOND,
-                0, // flags
-                0, // origin
-                0, // interval
-                0, // limit
-            );
+            println!("[SIMCONNECT] Connected to sim");
 
             Some(conn)
         } else {
@@ -210,6 +124,94 @@ impl Msfs {
         Self {
             conn: Self::try_connect(),
         }
+    }
+
+    fn subscribe_to_data(conn: &mut simconnect::SimConnector) {
+        // setup data definitions
+        conn.add_data_definition(
+            0,
+            "TITLE",
+            "",
+            simconnect::SIMCONNECT_DATATYPE_SIMCONNECT_DATATYPE_STRING128,
+            u32::MAX,
+            0.0,
+        );
+        conn.add_data_definition(
+            0,
+            "ENG COMBUSTION:1",
+            "Boolean",
+            simconnect::SIMCONNECT_DATATYPE_SIMCONNECT_DATATYPE_FLOAT64,
+            u32::MAX,
+            0.0,
+        );
+        conn.add_data_definition(
+            0,
+            "ENG COMBUSTION:2",
+            "Boolean",
+            simconnect::SIMCONNECT_DATATYPE_SIMCONNECT_DATATYPE_FLOAT64,
+            u32::MAX,
+            0.0,
+        );
+        conn.add_data_definition(
+            0,
+            "ENG COMBUSTION:3",
+            "Boolean",
+            simconnect::SIMCONNECT_DATATYPE_SIMCONNECT_DATATYPE_FLOAT64,
+            u32::MAX,
+            0.0,
+        );
+        conn.add_data_definition(
+            0,
+            "ENG COMBUSTION:4",
+            "Boolean",
+            simconnect::SIMCONNECT_DATATYPE_SIMCONNECT_DATATYPE_FLOAT64,
+            u32::MAX,
+            0.0,
+        );
+        conn.add_data_definition(
+            0,
+            "PLANE LATITUDE",
+            "Radians",
+            simconnect::SIMCONNECT_DATATYPE_SIMCONNECT_DATATYPE_FLOAT64,
+            u32::MAX,
+            0.0,
+        );
+        conn.add_data_definition(
+            0,
+            "PLANE LONGITUDE",
+            "Radians",
+            simconnect::SIMCONNECT_DATATYPE_SIMCONNECT_DATATYPE_FLOAT64,
+            u32::MAX,
+            0.0,
+        );
+        conn.add_data_definition(
+            0,
+            "SIM ON GROUND",
+            "Boolean",
+            simconnect::SIMCONNECT_DATATYPE_SIMCONNECT_DATATYPE_FLOAT64,
+            u32::MAX,
+            0.0,
+        );
+        conn.add_data_definition(
+            0,
+            "ATC ID",
+            "",
+            simconnect::SIMCONNECT_DATATYPE_SIMCONNECT_DATATYPE_STRING32,
+            u32::MAX,
+            0.0,
+        );
+
+        // receive data related to the user aircraft
+        conn.request_data_on_sim_object(
+            0, // request id
+            0, // define id
+            0, // object id (user)
+            simconnect::SIMCONNECT_PERIOD_SIMCONNECT_PERIOD_SECOND,
+            0, // flags
+            0, // origin
+            0, // interval
+            0, // limit
+        );
     }
 }
 
@@ -227,9 +229,15 @@ impl SimConnection for Msfs {
 
         let conn = self.conn.as_mut().unwrap();
         let msg = match conn.get_next_message() {
-            Ok(DispatchResult::Open(_)) => SimMessage::Open,
+            Ok(DispatchResult::Open(_)) => {
+                println!("[SIMCONNECT] Simulator opened");
+
+                Self::subscribe_to_data(conn);
+
+                SimMessage::Open
+            }
             Ok(DispatchResult::Quit(_)) => {
-                println!("Simulator closed");
+                println!("[SIMCONNECT] Simulator closed");
                 self.conn = None;
                 SimMessage::Quit
             }
@@ -246,11 +254,11 @@ impl SimConnection for Msfs {
                 }
             },
             Ok(msg) => {
-                println!("Unhandled message: {msg:?}");
+                println!("[SIMCONNECT] Unhandled message: {msg:?}");
                 SimMessage::Unknown
             }
             Err(e) => {
-                println!("SimConnect connection lost: {e}");
+                println!("[SIMCONNECT] Connection lost: {e}");
 
                 // reset connection, force retry
                 self.conn = None;

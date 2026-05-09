@@ -276,6 +276,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                     }
                 }
             }
+            Ok(SimMessage::Waiting) => {
+                println!("Waiting for simulator connection...");
+            }
             Ok(SimMessage::Open) => {
                 println!("Simulator connection established.")
             }
