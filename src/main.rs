@@ -259,9 +259,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                     current_flight = Some(Flight::new(&aircraft));
                 }
 
-                let closest_airport = search_within(&navdata, aircraft.position)?;
                 let flight = current_flight.as_mut().unwrap();
                 debug!("{:?}", flight);
+
                 match flight.state {
                     FlightState::Preflight => {
                         if aircraft.engine_on {
@@ -274,6 +274,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     }
                     FlightState::Taxi => {
                         if !aircraft.on_ground {
+                            let closest_airport = search_within(&navdata, aircraft.position)?;
                             flight.depart(closest_airport.as_ref(), &Utc::now());
                             flight.state = FlightState::EnRoute;
 
@@ -284,6 +285,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     }
                     FlightState::EnRoute => {
                         if aircraft.on_ground {
+                            let closest_airport = search_within(&navdata, aircraft.position)?;
                             flight.arrive(closest_airport.as_ref(), &Utc::now());
                             flight.state = FlightState::Landed;
 
