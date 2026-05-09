@@ -104,26 +104,21 @@ impl TryFrom<RawSimData> for Aircraft {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ConnectionState {
-    /// no connection yet established
-    Disconnected,
-    /// connected to sim, but not yet ready to send data
-    Connected,
-    /// connected to sim and ready to send data
-    Ready,
-}
-
 pub struct Msfs {
     conn: Option<simconnect::SimConnector>,
-    state: ConnectionState,
+    // has actually started streaming data? in MSFS the connection may be
+    // reported as Open, but that doesn't mean it's actually ready and loaded.
+    //
+    // We only reliably know that its ready when the connection starts sending
+    // SimData.
+    telemetry_active: bool,
 }
 
 impl Msfs {
     pub fn connect() -> Self {
         Self {
             conn: None,
-            state: ConnectionState::Disconnected,
+            telemetry_active: false,
         }
     }
 
@@ -143,7 +138,7 @@ impl Msfs {
 
     fn disconnect(&mut self) {
         self.conn = None;
-        self.state = ConnectionState::Disconnected;
+        self.telemetry_active = false;
     }
 
     fn subscribe_to_data(conn: &mut simconnect::SimConnector) {
@@ -253,7 +248,6 @@ impl SimConnection for Msfs {
                 debug!("Simulator opened");
 
                 Self::subscribe_to_data(conn);
-                self.state = ConnectionState::Connected;
 
                 SimMessage::Connecting
             }
@@ -263,9 +257,9 @@ impl SimConnection for Msfs {
                 SimMessage::Disconnected
             }
             Ok(DispatchResult::SimObjectData(data)) => unsafe {
-                if self.state != ConnectionState::Ready {
+                if !self.telemetry_active {
                     debug!("Aircraft data stream active, connection ready");
-                    self.state = ConnectionState::Ready;
+                    self.telemetry_active = true;
                 }
 
                 if data.dwDefineID == 0 {
@@ -284,7 +278,7 @@ impl SimConnection for Msfs {
                 SimMessage::Unknown
             }
             Err(e) => {
-                if self.state == ConnectionState::Ready {
+                if self.telemetry_active {
                     debug!("Connection lost: {e}");
                     // reset connection, force retry
                     self.disconnect();
