@@ -2,7 +2,13 @@ name: Tests
 on: push
 jobs:
   test:
-    runs-on: windows-latest
+    strategy:
+      matrix:
+        os:
+          - windows-2022
+          - windows-2025
+    
+    runs-on: ${{ matrix.os }}
 
     steps:
       - name: Checkout repo
