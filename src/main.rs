@@ -258,13 +258,10 @@ fn main() -> Result<(), Box<dyn Error>> {
                 }
 
                 // initialize current flight if there isn't one
-                if current_flight.is_none() {
+                let flight = current_flight.get_or_insert_with(|| {
                     println!("\n\n✈  {} — {}", aircraft.registration, aircraft.title);
-
-                    current_flight = Some(Flight::new(&aircraft));
-                }
-
-                let flight = current_flight.as_mut().unwrap();
+                    Flight::new(&aircraft)
+                });
                 debug!("{:?}", flight);
 
                 match flight.state {
