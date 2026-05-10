@@ -251,10 +251,11 @@ fn main() -> Result<(), Box<dyn Error>> {
                 }
 
                 // reset flight if aircraft is changed
-                if let Some(flight) = &current_flight {
-                    if !flight.aircraft.is_same_airframe(&aircraft) {
-                        current_flight = None;
-                    }
+                if current_flight
+                    .as_ref()
+                    .is_some_and(|f| !f.aircraft.is_same_airframe(&aircraft))
+                {
+                    current_flight = None;
                 }
 
                 // initialize current flight if there isn't one
@@ -283,6 +284,10 @@ fn main() -> Result<(), Box<dyn Error>> {
                             if let Some((airport, time)) = &flight.departure {
                                 println!("🛫 Departed {} at {}", airport, time.format("%H:%M UTC"));
                             }
+                        } else if !aircraft.engine_on {
+                            // engine shut down after start, but before flight
+                            flight.state = FlightState::Preflight;
+                            println!("🟡 Engine(s) shut down before departure");
                         }
                     }
                     FlightState::EnRoute => {
