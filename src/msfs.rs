@@ -106,7 +106,7 @@ impl TryFrom<RawSimData> for Aircraft {
 
 pub struct Msfs {
     conn: Option<simconnect::SimConnector>,
-    // has actually started streaming data? in MSFS the connection may be
+    // Has MSFS started streaming data to us? in MSFS the connection may be
     // reported as Open, but that doesn't mean it's actually ready and loaded.
     //
     // We only reliably know that its ready when the connection starts sending
