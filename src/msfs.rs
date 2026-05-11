@@ -7,19 +7,30 @@ use std::{ffi, ptr, str, thread, time};
 
 #[derive(Debug)]
 enum SimStringError {
-    Utf8Error(str::Utf8Error),
-    CStrError(ffi::FromBytesUntilNulError),
+    Utf8(str::Utf8Error),
+    CStr(ffi::FromBytesUntilNulError),
 }
+
+impl std::fmt::Display for SimStringError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Utf8(e) => write!(f, "{e}"),
+            Self::CStr(e) => write!(f, "{e}"),
+        }
+    }
+}
+
+impl std::error::Error for SimStringError {}
 
 impl From<str::Utf8Error> for SimStringError {
     fn from(value: str::Utf8Error) -> Self {
-        Self::Utf8Error(value)
+        Self::Utf8(value)
     }
 }
 
 impl From<ffi::FromBytesUntilNulError> for SimStringError {
     fn from(value: ffi::FromBytesUntilNulError) -> Self {
-        Self::CStrError(value)
+        Self::CStr(value)
     }
 }
 
@@ -50,7 +61,10 @@ impl<const N: usize> SimString<N> {
 
 impl<const N: usize> std::fmt::Display for SimString<N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.to_string().unwrap())
+        match self.to_string() {
+            Ok(s) => f.write_str(&s),
+            Err(e) => write!(f, "<invalid sim string: {e}>"),
+        }
     }
 }
 
